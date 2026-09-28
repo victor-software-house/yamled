@@ -40,7 +40,8 @@ Multiline strings use `indoc!` and `formatdoc!`. No `concat!`, and no escaped
 ## Release
 
 A human writes `.changeset/*.md` on the same PR that ships the behaviour.
-Never hand-edit a version or `CHANGELOG.md`. Declarations live in
+Every changeset is a `patch` bump; do not write `minor` or `major` until the
+operator decides otherwise. Never hand-edit a version or `CHANGELOG.md`. Declarations live in
 [`.ctl/ver.yaml`](.ctl/ver.yaml); verctl opens the Version PR, and merging it
 publishes to crates.io.
 
