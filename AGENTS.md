@@ -3,7 +3,7 @@
 Format-preserving YAML edits for Rust. **A library, not a command.** Import
 as `yamled`.
 
-This repo's queue is [`tasks.yaml`](tasks.yaml) (`YAMLED-###`).
+This repo's queue is [`tasks.yaml`](tasks.yaml) (`YMD-###`).
 
 ## What this crate owns
 
@@ -51,7 +51,9 @@ mise run verify
 ```
 
 `verify` is format, clippy, feature sets, nextest, doc-tests, cargo-deny
-licenses, bans, and sources, and cargo-machete. Advisories run on CI only
+licenses, bans, and sources, cargo-machete, and `openspec validate --all
+--strict`. mise pins OpenSpec (`npm:@fission-ai/openspec`, installed through
+Bun); do not use a global `openspec`. Advisories run on CI only
 (`mise run deny:advisories`). Locally, `.miserc.toml` adds the `mbx` env,
 which routes Cargo through mr-boxington.
 
