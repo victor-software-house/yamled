@@ -29,7 +29,7 @@
   the build host.
 - [x] 3.2 Drop `--no-tests=warn` from the nextest task. Verify: `mise.dev.toml`
   diff.
-- [x] 3.3 A minor changeset for 0.1.0 and crate docs with a runnable example.
+- [x] 3.3 A patch changeset for 0.0.1 and crate docs with a runnable example.
   Verify: `mise run test:doc` and `cargo package --locked`.
 
 ## Evidence

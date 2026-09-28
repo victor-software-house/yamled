@@ -48,7 +48,7 @@ None.
 
 ## Impact
 
-- New public API in `yamled` 0.1.0.
+- New public API in `yamled` 0.0.1, a patch release after the 0.0.0 name reservation.
 - First consumers: qctl, to replace `yamlpath`, `yamlpatch`, and `yaml_serde`
   in its ledger edits; ctl-core, to place schema errors on their line.
 - Out of scope, recorded for a later full document model: node handles that
