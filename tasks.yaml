@@ -1,7 +1,19 @@
 # yaml-language-server: $schema=https://github.com/victor-software-house/qctl/releases/download/v0.4.4/tasks.schema.json
 schema_version: 4
 prefix: YMD
-active: null
-queue: []
+active: YMD-001
+queue:
+  - id: YMD-001
+    title: Edit YAML in place through a location index
+    scope: yamled
+    outcome: A caller replaces, removes, inserts, and moves YAML values by path, and every byte it did not name stays as it was.
+    blocked_by: []
+    acceptance:
+      - 'Document::parse indexes a source through granit-parser: each node''s byte range, key range, owned comments, and style, addressed by keys and indexes or a JSON pointer.'
+      - replace, remove, insert, push, take, and put edit the source as byte splices; each edit parses the result or fails and leaves the source unchanged.
+      - A comment directly above a node, with no blank line between, moves and is removed with that node.
+      - 'Whole-file tests on ledger-shaped fixtures: each edit changes only the lines it names.'
+      - The nextest task no longer allows an empty test run.
+    plan: openspec/changes/index-and-edits/proposal.md
 archive: []
 horizon: []

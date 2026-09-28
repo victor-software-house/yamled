@@ -53,7 +53,7 @@ url = "https://github.com/jdx/mr-boxington/releases/download/v1.20.0/mbx-x86_64-
 signer = "sigstore-oidc:https://github.com/jdx/mr-boxington/.github/workflows/release.yml"
 
 [[tools.rust]]
-version = "nightly-2026-09-28"
+version = "nightly-2026-08-16"
 backend = "core:rust"
 specifiers = ["nightly"]
 

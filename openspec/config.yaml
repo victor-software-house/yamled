@@ -12,7 +12,8 @@ context: |
   change maps to one queue row.
   Writing style: plain English, short sentences, numbered lists, no em-dashes,
   no emojis. This repository is public: no local paths, machine names, or
-  private repository names in any artifact.
+  private repository names in any artifact. Every reference is a clickable
+  reference-style link, pinned to a commit for code and files; no bare URLs.
 
 rules:
   proposal:
