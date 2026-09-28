@@ -1,0 +1,9 @@
+# Loaded when MISE_ENV contains `mbx` (local default via .miserc.toml).
+# Routes this checkout's Cargo through mr-boxington, a shared build cache,
+# so several worktrees reuse one store and one CPU and memory budget.
+# CI leaves `mbx` out and keeps its own cache.
+
+[tools]
+# Repeats the dev entry: an env overlay replaces the whole tool entry.
+rust = { version = "nightly", components = "rustfmt,clippy", mr_boxington = true }
+mr-boxington = "1.20.0"

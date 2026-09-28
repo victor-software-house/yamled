@@ -1,0 +1,28 @@
+schema: spec-driven
+
+context: |
+  yamled is a Rust library for format-preserving YAML edits. It indexes a
+  YAML source through granit-parser spans (node, key, owned comments,
+  indentation, style), applies replace, remove, insert, and move edits as
+  byte splices, and reads and writes values through serde-saphyr. Every byte
+  an edit does not name stays as it was.
+  First consumer: qctl, which edits tasks.yaml ledgers. ctl-core uses the
+  location index to put schema errors on their line.
+  Contracts: AGENTS.md. Work queue: tasks.yaml (YAMLED-###). One openspec
+  change maps to one queue row.
+  Writing style: plain English, short sentences, numbered lists, no em-dashes,
+  no emojis. This repository is public: no local paths, machine names, or
+  private repository names in any artifact.
+
+rules:
+  proposal:
+    - State the measured problem, with numbers where they exist.
+    - Name the YAMLED row the change belongs to.
+  specs:
+    - Every requirement uses SHALL and has at least one WHEN/THEN scenario.
+    - Scenarios quote the exact YAML before and after an edit.
+  design:
+    - Each decision names the alternative considered and why it lost.
+  tasks:
+    - Each task names the command or observation that proves it is done.
+    - Compile, format, lint, and test tasks run on the build host, not the authoring workstation.

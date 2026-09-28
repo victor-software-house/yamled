@@ -1,0 +1,7 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/victor-software-house/qctl/main/schema/tasks.schema.json
+schema_version: 4
+prefix: YAMLED
+active: null
+queue: []
+archive: []
+horizon: []
