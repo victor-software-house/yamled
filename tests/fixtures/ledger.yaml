@@ -1,0 +1,185 @@
+# yaml-language-server: $schema=https://github.com/victor-software-house/qctl/releases/download/v0.4.2/tasks.schema.json
+schema_version: 4
+prefix: CTC
+
+style:
+  timezone: "-03:00"
+  section_order: [queue, horizon, archive]
+active: CTC-006
+
+queue:
+  - id: CTC-006
+    title: Test fixture tree and per-suite temp dirs
+    scope: ctl-core
+    outcome: >-
+      Integration tests write files through a small fixture API, not
+      repeated fs::write + indoc. Each suite or scenario gets its own
+      temp root.
+    blocked_by: []
+    acceptance:
+      - "A cfg(test) or ctl-core test feature exposes the helper (not a new public runtime crate unless we need one)."
+      - "root.file(path, body) (or equivalent) is the write path. Nested paths create parents."
+      - "Suite::new(name) / suite.scenario(name) each own a TempDir that drops at the end of the test."
+      - "verctl (then qctl/forkctl) can drop the copy-pasted fs::write fixtures after pinning that ctl-core version."
+    notes:
+      - Triggered by verctl tests (prepare_stage, changelog, publish). Do not invent a second tempfile wrapper in each *ctl.
+
+  - id: CTC-008
+    title: Own the declared-input layer every ctl CLI parses config with
+    scope: ctl-core
+    outcome: >-
+      One implementation of "read it, parse the shape, validate it once,
+      complain in the repo's own words" — instead of one per CLI, drifting.
+    blocked_by: []
+    acceptance:
+      - 'The shared validators live here: a path that must stay inside the repository, a single file name, a list that needs at least one entry, a value that cannot be empty.'
+      - Each one is a garde `custom` rule generic over the context, so it works in a schema validated against nothing and in one validated against the whole document.
+      - A complaint says what a person changes ("must declare at least one label"), never a stock validator's wording ("length is lower than 1").
+      - 'One entry point loads a file: read, serde for shape, garde once at the boundary, nothing downstream re-checking.'
+      - verctl drops its own src/schema.rs after pinning that ctl-core version, and no copy is left behind.
+      - The declare-your-own-target template renderer is available to any ctl CLI, not only verctl.
+      - qctl drops its own YAML parsing for config after pinning that ctl-core version.
+      - The loader parses YAML with one crate, and every YAML input verctl and qctl read goes through it, including verctl's .ctl/ver.yaml and qctl's config.
+    notes:
+      - >2-
+        2026-08-18: verctl built this while shipping served files (VER-018, and VER-022 is the matching row there). It is already shared between two unrelated schemas in that repo — a TOML config file and a Jinja template's own exports — which is the evidence it is not verctl-shaped. Do this row before VER-022 so that one is a move rather than a fork. Related: qctl's schemars work and VER-021 want JSON Schema generated from these same types, so keep the types derive-friendly.
+      - >2-
+        2026-09-24: verctl parses YAML with yaml_serde 0.10.7 and qctl with serde_yml 0.0.12, so two ctl CLIs already disagree on the parser. Pick one crate here, by our own evaluation, and move both.
+      - >2-
+        2026-09-24: verctl's config is YAML (.ctl/ver.yaml) since verctl 0.1.0. The TOML file in the 2026-08-18 note is gone.
+
+horizon: []
+
+archive:
+  - id: CTC-013
+    title: Let the environment override each style option
+    scope: presentation
+    outcome: An operator picks the record style, list style, row separation, and JSON layout per shell without a rebuild; the library defaults and overrides stay as they are.
+    links:
+      - https://github.com/victor-software-house/ctl-core/tree/main/openspec/changes/choose-visual-identity
+    completed: 2026-09-23T20:37:11
+    evidence:
+      - https://github.com/victor-software-house/ctl-core/pull/65
+    disposition: completed
+
+  - id: CTC-010
+    title: Own the unified ctl presentation kernel
+    scope: ctl-core and all ctl consumers
+    outcome: One typed Rust chassis in ctl-core renders pretty, colorless, JSON, help, notices, and errors through composable semantic primitives; consumer CLIs own domain data and import no terminal renderer.
+    completed: 2026-09-23T20:19:00
+    evidence:
+      - https://github.com/victor-software-house/ctl-core/pull/63
+    disposition: completed
+
+  - id: CTC-003
+    title: Optional per-user daemon sharing one session and view
+    scope: ctl-core
+    outcome: Multiple ctl clients could attach to one local per-user session and share one view.
+    notes:
+      - Same idea as QCTL-007. The one implementation now lives in the unixd repository.
+    completed: 2026-09-23T16:06:51
+    evidence:
+      - 'Moved out of ctl-core: the daemon and cache now live in their own public repository, github.com/victor-software-house/unixd, as the unixd and unixd-cache crates. No ctl CLI needs them.'
+    disposition: dropped
+
+  - id: CTC-012
+    title: Isolate Surface model dependencies
+    scope: ctl-core
+    outcome: Consumers can extract, validate, or serialize a Clap Surface without MiniJinja, while the existing surface feature remains a compatible aggregate for template rendering.
+    completed: 2026-09-12T23:33:43
+    evidence:
+      - https://github.com/victor-software-house/ctl-core/pull/42
+      - 'ctl-core 8e58d61: surface-model excludes MiniJinja, surface-serde serializes without it, surface-templates adds it, and surface remains compatible; focused tier tests, cargo metadata/tree proofs, 119-test full verify, ledger check, and CI pass.'
+    disposition: completed
+
+  - id: CTC-011
+    title: Reserve a safe terminal-width margin in nested shells
+    scope: ctl-core renderer
+    outcome: Automatically detected terminal widths reserve one column before wrapping and table layout, so nested terminal shells do not clip or break the right edge; explicit render widths remain exact.
+    completed: 2026-09-12T18:01:15
+    evidence:
+      - https://github.com/victor-software-house/ctl-core/pull/39
+      - 'ctl-core 7fba205 on combined head 33a2e66: configurable width buffer and full-control overrides coexist with the short-option surface guard; range-diff is exact and mise run verify passed on the build host.'
+    disposition: completed
+
+  - id: CTC-009
+    title: Prove this repo's release lane by shipping one release through it
+    scope: ctl-core
+    outcome: >-
+      The next ctl-core version comes out of a Version PR, so the lane is
+      known to work here rather than assumed to because it works elsewhere.
+    notes:
+      - >-
+        2026-08-18, checked rather than assumed. The lane is wired and green — Version PR ran twice on main today — but it has never carried a release: there is no changeset, so every run no-ops. v0.0.1 through v0.0.3 were cut by hand, which the history shows plainly, because CHANGELOG.md was last touched by a feature commit (f8cfdf6) and no "version packages" commit exists at all. `[prepare]` arrived after that in cf11ac2 (#6) and has therefore never run. This matters because ctl-core is about to become the home of the declared-input layer (CTC-008), and verctl will pin it — a release path nobody has walked is a bad thing to discover while migrating two other repos onto it. The pin here is still verctl 0.0.3, so this repo has neither served files nor pins-on-the-Version-PR yet.
+    completed: 2026-08-22T15:18:10
+    evidence:
+      - 'ctl-core#12 carried the changeset. #13 was the Version PR: 0.0.3 to 0.0.4, CHANGELOG written, Cargo.lock staged by cargo update --workspace.'
+      - 'First Publish failed: origin/main missing on a shallow checkout. #14 added fetch-depth: 0. Dispatch then published.'
+      - tag v0.0.4 is at 5b02305, the same SHA as GitHub Release target_commitish. Cargo.lock in that tree is 0.0.4. crates.io has 0.0.4.
+    disposition: completed
+
+  - id: CTC-007
+    title: Version PR uses the released verctl tarball
+    scope: ci
+    completed: "2026-08-17T05:59:57"
+    disposition: completed
+    outcome: >-
+      Version PR execs github:verctl from PATH. No cargo install --git.
+      mise envs match verctl: rust in dev, tarball in release.
+    evidence:
+      - "github.com/victor-software-house/ctl-core/pull/3"
+      - "MISE_ENV=release on Version PR; mise install --locked"
+      - "MISE_ENV=dev,release on Publish"
+
+  - id: CTC-005
+    title: ColorMode tables for command pretty output
+    scope: ctl-core
+    completed: "2026-08-17T02:21:47"
+    disposition: completed
+    outcome: >-
+      kv/grid take ColorMode. never emits no ANSI. View.show
+      passes the view color. Consumers do not strip ANSI.
+    evidence:
+      - "crates.io ctl-core 0.0.3"
+      - "src/table.rs; tests use ColorMode::Never"
+
+  - id: CTC-002
+    title: Publish ctl-core to crates.io
+    scope: ctl-core
+    completed: "2026-08-17T01:23:25"
+    disposition: completed
+    outcome: >-
+      Consumers pin a crates.io version instead of a git rev.
+    evidence:
+      - "crates.io ctl-core 0.0.3"
+      - "github.com/victor-software-house/ctl-core/releases/tag/v0.0.3"
+      - "mise github:victor-software-house/verctl@0.0.1 for publish"
+
+  - id: CTC-004
+    title: Harden ctl-core tests before any consumer migration
+    scope: ctl-core
+    completed: "2026-08-17T00:17:36"
+    disposition: completed
+    outcome: >-
+      Public API is covered harder than forkctl+qctl+verctl chassis
+      tests. No extra clap/help copies land until this is green.
+    evidence:
+      - "github.com/victor-software-house/ctl-core main fdf6e67"
+      - "tests/{color_argv,format_tokens,flags_cli,flag_warnings,help_render,view,parse}"
+      - "peek --color --no-color; first-party concat! still fails clippy"
+      - "chassis last-wins + {bin}: warning: on clashes"
+    notes:
+      - Do not pad empty tests to out-count forkctl+qctl+verctl. Named public-path coverage is the bar.
+
+  - id: CTC-001
+    title: Shared clap chassis, views, and formatdoc
+    scope: ctl-core
+    completed: "2026-08-16T23:13:19"
+    disposition: completed
+    outcome: >-
+      ctl-core owns flatten flags, styled help, Envelope/View, and
+      formatdoc. Not a command.
+    evidence:
+      - "github.com/victor-software-house/ctl-core main 02c7e9f"
+      - "prelude, Render, FormatArgs/ColorLong, cargo features"
+      - "verctl already consumes it"

@@ -9,9 +9,9 @@ SHALL fail and the source SHALL stay unchanged.
 
 #### Scenario: Replacing one value leaves the rest of the file byte-identical
 
-- **WHEN** a 479-line ledger has `active: A-1` on line 8
-- **AND** the caller replaces `active` with `A-2`
-- **THEN** exactly one line differs: `active: A-2`
+- **WHEN** a ledger has `active: CTC-006` on line 8
+- **AND** the caller replaces `active` with `CTC-008`
+- **THEN** exactly one line differs: `active: CTC-008`
 
 ### Requirement: Replace a value
 

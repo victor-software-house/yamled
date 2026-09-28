@@ -56,8 +56,9 @@ which is the workaround qctl carries today.
 
 ### 5. Values go through `serde-saphyr`
 
-A compound value is serialized with `serde-saphyr` (indent step 2, YAML 1.2
-output) and re-indented to the target column. The list style (items under
+A compound value is serialized with `serde-saphyr` (indent step 2; its
+`yaml_12` option is left off because it emits a `%YAML` directive, and off it
+quotes YAML 1.1 words such as `no`) and re-indented to the target column. The list style (items under
 their key, or at the key's column) is detected from the first block list that
 is a mapping value in the file, and passed as `compact_list_indent`. A string
 scalar is written by yamled's own rule (plain, then single-quoted, then
