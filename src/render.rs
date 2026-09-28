@@ -45,9 +45,20 @@ impl Rendered {
     /// The text after `key:`, for a key at `key_column`. `compact` puts list
     /// items at the key's column instead of under it.
     pub(crate) fn after_key(&self, key_column: usize, compact: bool) -> String {
+        self.after_key_at(key_column, key_column + 2, compact)
+    }
+
+    /// As [`Self::after_key`], with a block scalar's text at `body_column`, so
+    /// a replaced block keeps the indentation it had.
+    pub(crate) fn after_key_at(
+        &self,
+        key_column: usize,
+        body_column: usize,
+        compact: bool,
+    ) -> String {
         if let (Kind::Scalar, Some(head)) = (self.kind, &self.head) {
             let mut lines = vec![format!(" {head}")];
-            lines.extend(indent(&self.body, key_column + 2));
+            lines.extend(indent(&self.body, body_column));
             return join(&lines);
         }
         let step = if self.kind == Kind::Sequence && compact {
@@ -127,6 +138,20 @@ fn inline(head: &str) -> Rendered {
         head: Some(head.to_owned()),
         body: Vec::new(),
         kind: Kind::Scalar,
+    }
+}
+
+/// A scalar as it may appear inside `[...]` or `{...}`, where `,`, `[`, `]`,
+/// `{`, and `}` end a plain scalar. A plain head holding one is quoted;
+/// quoted heads and nested flow collections pass through.
+pub(crate) fn flow_safe(head: &str) -> String {
+    if head.starts_with(['\'', '"', '[', '{']) || !head.contains([',', '[', ']', '{', '}']) {
+        return head.to_owned();
+    }
+    if head.contains('\'') {
+        format!("\"{}\"", escape(head))
+    } else {
+        format!("'{head}'")
     }
 }
 

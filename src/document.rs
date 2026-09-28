@@ -358,10 +358,14 @@ impl Document {
                 }
                 let (colon, key_column) = self.colon(path, id)?;
                 let step = if self.compact { 0 } else { 2 };
-                let mut placed = vec![String::new()];
-                placed.extend(indent(&lines, key_column + step));
                 let end = self.index.nodes[id].value.end;
-                self.commit_splice(colon, end, &join(&placed))
+                let key_line_end = line_end(&self.source, end);
+                let rest = self.source[end..key_line_end].trim_end_matches(LF);
+                let mut placed = vec![rest.to_owned()];
+                placed.extend(indent(&lines, key_column + step));
+                let mut with = join(&placed);
+                with.push(LF);
+                self.commit_splice(colon, key_line_end, &with)
             }
             _ => Err(Error::WrongKind {
                 path: path.clone(),
@@ -422,7 +426,8 @@ impl Document {
         match parent_style {
             Some(Style::BlockMapping) => {
                 let (colon, key_column) = self.colon(path, id)?;
-                let text = rendered.after_key(key_column, self.compact);
+                let body_column = self.block_body_column(id).unwrap_or(key_column + 2);
+                let text = rendered.after_key_at(key_column, body_column, self.compact);
                 self.commit_splice(colon, value.end, &text)
             }
             Some(Style::BlockSequence) => {
@@ -430,7 +435,7 @@ impl Document {
                 self.commit_splice(value.start, value.end, &text)
             }
             Some(_) if inline => {
-                let head = rendered.head.clone().unwrap_or_default();
+                let head = render::flow_safe(rendered.head.as_deref().unwrap_or_default());
                 self.commit_splice(value.start, value.end, &head)
             }
             Some(_) => Err(Error::Unsupported {
@@ -447,6 +452,15 @@ impl Document {
                 self.commit_splice(value.start, value.end, &join(&lines))
             }
         }
+    }
+
+    /// The column a block scalar's text starts at; the parser's span for a
+    /// block scalar begins at its text, not at the `>` or `|` header. `None`
+    /// for any other node.
+    fn block_body_column(&self, id: usize) -> Option<usize> {
+        let node = &self.index.nodes[id];
+        matches!(node.style, Style::Folded | Style::Literal)
+            .then(|| column(&self.source, node.value.start))
     }
 
     fn remove_entry(&mut self, path: &Path, id: usize, parent: usize) -> Result<(), Error> {
@@ -468,8 +482,22 @@ impl Document {
             .position(|&sibling| sibling == id)
             .unwrap_or(0);
         let next = siblings[position + 1];
-        let to = self.index.entry_start(next);
-        self.commit_splice(entry, to, "")
+        let next_entry = self.index.entry_start(next);
+        let comments_start = self.index.owned_start(&self.source, next);
+        let comments_end = line_start(&self.source, next_entry);
+        let line = line_start(&self.source, entry);
+        let dash_column = column(&self.source, self.dash_before(entry));
+        let comments: Vec<String> = self.source[comments_start..comments_end]
+            .lines()
+            .map(|comment| comment.trim_start().to_owned())
+            .collect();
+        let mut with = String::new();
+        for comment in indent(&comments, dash_column) {
+            with.push_str(&comment);
+            with.push(LF);
+        }
+        with.push_str(&self.source[line..entry]);
+        self.commit_splice(line, next_entry, &with)
     }
 
     /// The splice that takes a sequence item out, and the item's text
@@ -487,10 +515,16 @@ impl Document {
                 path: path.clone(),
                 what: "take the only item of a sequence with no key",
             })?;
+            let key_line = &source[colon..line_end(source, colon)];
+            let with = if key_line.trim().is_empty() {
+                format!(" []{LF}")
+            } else {
+                format!(" []{key_line}")
+            };
             return Ok(Cut {
                 from: colon,
                 to: end,
-                with: format!(" []{LF}"),
+                with,
                 text,
             });
         }
@@ -518,11 +552,15 @@ impl Document {
 
     /// The byte of the `-` that starts a sequence item.
     fn dash(&self, id: usize) -> usize {
-        let value = self.index.nodes[id].value.start;
-        let line = line_start(&self.source, value);
-        self.source[line..value]
+        self.dash_before(self.index.nodes[id].value.start)
+    }
+
+    /// The byte of the last `-` on the line before `at`, or `at` itself.
+    fn dash_before(&self, at: usize) -> usize {
+        let line = line_start(&self.source, at);
+        self.source[line..at]
             .rfind('-')
-            .map_or(value, |offset| line + offset)
+            .map_or(at, |offset| line + offset)
     }
 
     fn insert_rendered(

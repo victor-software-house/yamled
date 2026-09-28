@@ -43,11 +43,16 @@ sources, cargo-machete, and `openspec validate --all --strict`.
 [`tests/edits.rs`](../../../tests/edits.rs); the ledger fixture is a copy of
 the public [ctl-core ledger][ctl-core-ledger].
 
-Not verified: CI on GitHub, which runs on the pull request.
+2026-09-28, after Kody's review of [yamled#1][yamled#1]: four fixes with a test
+each (a flow scalar holding `,` is quoted; removing a dash-line key keeps the
+next key's comment; emptying and refilling a list keeps the key-line comment; a
+replaced block scalar keeps its indentation). `mise run verify` passed again on
+the build host: 33 tests and the doc-test.
 
 `deny.toml` now allows `BSD-3-Clause`, for `encoding_rs`, which
 `serde-saphyr`'s `deserialize` feature pulls in through `encoding_rs_io`; the
 same allowance is in [forkctl's policy][forkctl-deny].
 
+[yamled#1]: https://github.com/victor-software-house/yamled/pull/1
 [ctl-core-ledger]: https://github.com/victor-software-house/ctl-core/blob/65eecc4450a1b522c4db4cba47055214cf3b0296/tasks.yaml
 [forkctl-deny]: https://github.com/victor-software-house/forkctl/blob/9f9ec4f767e174c83a6a582deac4577dfa511a67/deny.toml#L12

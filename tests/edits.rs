@@ -491,3 +491,86 @@ fn edits_that_do_not_fit_are_refused_and_change_nothing() {
     ));
     assert_eq!(document.as_str(), source);
 }
+
+#[test]
+fn a_flow_scalar_with_a_flow_indicator_is_quoted() {
+    let mut document = Document::parse(indoc! {"
+        list: [x]
+        flow: {a: 1}
+    "})
+    .unwrap();
+    document
+        .replace(&root().key("list").index(0), "a, b")
+        .unwrap();
+    document
+        .replace(&root().key("flow").key("a"), "x, y")
+        .unwrap();
+    assert_eq!(
+        document.as_str(),
+        indoc! {"
+        list: ['a, b']
+        flow: {a: 'x, y'}
+    "}
+    );
+}
+
+#[test]
+fn removing_a_dash_line_key_keeps_the_next_keys_comment() {
+    let mut document = Document::parse(indoc! {"
+        - id: A-1
+          # why the title
+          title: Kept
+    "})
+    .unwrap();
+    document.remove(&root().index(0).key("id")).unwrap();
+    assert_eq!(
+        document.as_str(),
+        indoc! {"
+        # why the title
+        - title: Kept
+    "}
+    );
+}
+
+#[test]
+fn emptying_and_refilling_a_list_keeps_the_key_line_comment() {
+    let mut document = Document::parse(indoc! {"
+        queue: # rows
+          - id: A-1
+        archive: [] # done
+    "})
+    .unwrap();
+    let row = document.take(&root().key("queue").index(0)).unwrap();
+    document.put(&root().key("archive"), 0, &row).unwrap();
+    assert_eq!(
+        document.as_str(),
+        indoc! {"
+        queue: [] # rows
+        archive: # done
+          - id: A-1
+    "}
+    );
+}
+
+#[test]
+fn a_replaced_block_scalar_keeps_its_indentation() {
+    let mut document = Document::parse(indoc! {"
+        row:
+            outcome: >-
+                  Old text.
+            next: kept
+    "})
+    .unwrap();
+    document
+        .replace(&root().key("row").key("outcome"), "New text.")
+        .unwrap();
+    assert_eq!(
+        document.as_str(),
+        indoc! {"
+        row:
+            outcome: >-
+                  New text.
+            next: kept
+    "}
+    );
+}

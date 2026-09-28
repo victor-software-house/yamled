@@ -68,10 +68,22 @@ rendering, which lost because the family is leaving it.
 
 ### 6. Errors
 
-`Error` is a closed enum: `Parse` (with line and column), `NoNode(Path)`,
-`WrongKind` (for example `push` on a mapping), `Invalid` (the edited text did
-not parse, with the parser's message), and `Serialize`. No `anyhow` in a
-library.
+`Error` is a closed, non-exhaustive enum: `Parse` (with line and column),
+`Pointer` (a malformed JSON pointer), `NoNode(Path)`, `WrongKind` (for example
+`push` on a mapping), `KeyExists` (an `insert` of a key the mapping has),
+`Unsupported` (valid YAML this version cannot write in place, such as a block
+value inside a flow collection), `Invalid` (the edited text did not parse,
+with the parser's message), and `Serialize`. No `anyhow` in a library.
+
+### 7. Flow context and key-line comments
+
+A plain scalar written inside `[...]` or `{...}` is quoted when it holds `,`,
+`[`, `]`, `{`, or `}`, because those end a plain scalar there even though the
+same text reads back unchanged in block context. Emptying a keyed list writes
+`[]` after the colon and keeps the rest of the key line, such as a comment;
+filling an empty list keeps that rest on the key line and writes the items
+below it. Removing the first key of a sequence item moves the comment lines
+owned by the next key above the item, so no neighbour's comment is lost.
 
 ## Risks
 
