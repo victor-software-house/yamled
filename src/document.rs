@@ -3,8 +3,8 @@ use std::ops::Range;
 
 use crate::index::{Index, Location, Style};
 use crate::text::{
-    LF, NEWLINE, column, dash_before, dedent, has_blank_line, indent, join, line_end, line_start,
-    spaced, starts_line, terminated,
+    LF, NEWLINE, column, comment_start, dash_before, dedent, has_blank_line, indent, join,
+    line_end, line_start, spaced, starts_line, terminated,
 };
 use crate::{Error, Path};
 
@@ -378,7 +378,7 @@ impl Document {
         let mut line_offset = 0;
         let mut found = None;
         for line in after.split_inclusive(LF) {
-            let code = line.find(" #").map_or(line, |comment| &line[..comment]);
+            let code = comment_start(line).map_or(line, |comment| &line[..comment]);
             if let Some(colon) = code.find(':') {
                 found = Some(line_offset + colon);
                 break;
@@ -455,11 +455,7 @@ impl Document {
         if let Some(value) = value.filter(|value| (colon..line_content).contains(&value.start)) {
             rest.replace_range(value.start - colon..value.end.min(line_content) - colon, "");
         }
-        let comment_at = rest
-            .char_indices()
-            .find(|&(at, c)| c == '#' && (at == 0 || rest[..at].ends_with([' ', '\t'])))
-            .map(|(at, _)| at);
-        let (properties, comment) = rest.split_at(comment_at.unwrap_or(rest.len()));
+        let (properties, comment) = rest.split_at(comment_start(&rest).unwrap_or(rest.len()));
         (properties.trim().to_owned(), comment.trim().to_owned())
     }
 

@@ -133,6 +133,26 @@ impl Rendered {
         }
     }
 
+    /// Whether a core tag names this value's kind, so the tag can stay in
+    /// front of it: `seq`, `map`, and `str` by shape, and `int`, `float`,
+    /// `bool`, and `null` by what the text reads as.
+    pub(crate) fn fits_core_tag(&self, name: &str) -> bool {
+        match (name, self) {
+            ("seq", Self::Sequence(_)) | ("map", Self::Mapping(_)) => true,
+            ("seq", Self::Scalar { head, body }) => body.is_empty() && head.starts_with('['),
+            ("map", Self::Scalar { head, body }) => body.is_empty() && head.starts_with('{'),
+            ("str", Self::Scalar { head, body }) => !body.is_empty() || read_string(head).is_some(),
+            (scalar, Self::Scalar { head, body }) if body.is_empty() => matches!(
+                (scalar, read_scalar(head)),
+                ("int", Some(Captured::Int))
+                    | ("float", Some(Captured::Float | Captured::Int))
+                    | ("bool", Some(Captured::Bool))
+                    | ("null", Some(Captured::Null))
+            ),
+            _ => false,
+        }
+    }
+
     /// Whether the value is a block scalar with an explicit indentation
     /// indicator, which YAML measures from the key's indentation.
     pub(crate) fn has_indicator(&self) -> bool {
@@ -338,7 +358,7 @@ fn reads_back(rendered: &Rendered, expected: &str) -> bool {
             map.len() == 1
                 && map
                     .get("v")
-                    .is_some_and(|value| value.0.as_deref() == Some(expected))
+                    .is_some_and(|value| matches!(value, Captured::Text(text) if text == expected))
         },
     )
 }
@@ -346,14 +366,25 @@ fn reads_back(rendered: &Rendered, expected: &str) -> bool {
 /// The string a serialized scalar holds, or `None` when it reads as another
 /// type such as a number or a boolean.
 fn read_string(yaml: &str) -> Option<String> {
-    serde_saphyr::from_str_with_options::<Captured>(yaml, reader())
-        .ok()?
-        .0
+    match read_scalar(yaml)? {
+        Captured::Text(text) => Some(text),
+        Captured::Int | Captured::Float | Captured::Bool | Captured::Null => None,
+    }
 }
 
-/// A value that remembers the string it was read from, and nothing when it
-/// was read as any other type.
-struct Captured(Option<String>);
+/// What a scalar reads as under the family's reader settings.
+fn read_scalar(yaml: &str) -> Option<Captured> {
+    serde_saphyr::from_str_with_options::<Captured>(yaml, reader()).ok()
+}
+
+/// What a scalar was read as, keeping the text of a string.
+enum Captured {
+    Text(String),
+    Int,
+    Float,
+    Bool,
+    Null,
+}
 
 impl<'de> Deserialize<'de> for Captured {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
@@ -367,31 +398,31 @@ impl<'de> Deserialize<'de> for Captured {
             }
 
             fn visit_str<E: de::Error>(self, value: &str) -> Result<Captured, E> {
-                Ok(Captured(Some(value.to_owned())))
+                Ok(Captured::Text(value.to_owned()))
             }
 
             fn visit_bool<E: de::Error>(self, _: bool) -> Result<Captured, E> {
-                Ok(Captured(None))
+                Ok(Captured::Bool)
             }
 
             fn visit_i64<E: de::Error>(self, _: i64) -> Result<Captured, E> {
-                Ok(Captured(None))
+                Ok(Captured::Int)
             }
 
             fn visit_u64<E: de::Error>(self, _: u64) -> Result<Captured, E> {
-                Ok(Captured(None))
+                Ok(Captured::Int)
             }
 
             fn visit_f64<E: de::Error>(self, _: f64) -> Result<Captured, E> {
-                Ok(Captured(None))
+                Ok(Captured::Float)
             }
 
             fn visit_unit<E: de::Error>(self) -> Result<Captured, E> {
-                Ok(Captured(None))
+                Ok(Captured::Null)
             }
 
             fn visit_none<E: de::Error>(self) -> Result<Captured, E> {
-                Ok(Captured(None))
+                Ok(Captured::Null)
             }
         }
 

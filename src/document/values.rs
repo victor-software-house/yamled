@@ -165,6 +165,7 @@ impl Document {
                 let on_key_line = value.start <= key_line_content;
                 let block = matches!(self.index.nodes[id].style, Style::Literal | Style::Folded);
                 if on_key_line && !block && rendered.inline_head().is_some() {
+                    check_tags(path, &self.source[colon..value.start], rendered)?;
                     let from = colon + self.source[colon..value.start].trim_end().len();
                     let text = rendered.after_key_at(key_column, body_column, self.compact);
                     return self.commit_splice(from, value.end, &text);
@@ -178,6 +179,7 @@ impl Document {
                     (spaced(&[&properties, own_line]), comment)
                 };
                 let properties = node_properties(&properties);
+                check_tags(path, &properties, rendered)?;
                 let to = if on_key_line {
                     value.end.max(key_line_content)
                 } else {
@@ -193,6 +195,8 @@ impl Document {
                 self.commit_splice(colon, to, &text)
             }
             Some(Style::BlockSequence) => {
+                let before = self.source.get(self.dash(id) + 1..value.start);
+                check_tags(path, before.unwrap_or_default(), rendered)?;
                 let text = rendered.after_dash(column(&self.source, self.dash(id)));
                 let lead = if self.source[..value.start].ends_with([' ', '\t']) {
                     ""
@@ -371,4 +375,29 @@ fn node_properties(text: &str) -> String {
         .filter(|token| token.starts_with(['&', '!']))
         .collect();
     properties.join(" ")
+}
+
+/// Refuse a replace whose kept tags would retype the new value. An anchor
+/// and a local tag (`!name`) always stay; a core tag stays only when it names
+/// the new value's kind, so `!!int` stays in front of `8081` and refuses the
+/// edit in front of `abc`.
+fn check_tags(path: &Path, properties: &str, rendered: &Rendered) -> Result<(), Error> {
+    let fits = properties
+        .split_whitespace()
+        .filter(|token| token.starts_with('!'))
+        .all(|tag| {
+            let core = tag.strip_prefix("!!").or_else(|| {
+                tag.strip_prefix("!<tag:yaml.org,2002:")
+                    .and_then(|name| name.strip_suffix('>'))
+            });
+            core.is_none_or(|name| rendered.fits_core_tag(name))
+        });
+    if fits {
+        Ok(())
+    } else {
+        Err(Error::Unsupported {
+            path: path.clone(),
+            what: "replace a value whose tag does not fit the new value",
+        })
+    }
 }

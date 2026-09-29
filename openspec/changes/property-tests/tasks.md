@@ -39,6 +39,11 @@ unsupported. Defects found and fixed, each with a test in
 11. A `|+` scalar, an empty block scalar, or a line of deeper spaces changed
     the value's trailing lines when replaced.
 
+After review, the comment rule is shared by `colon()` and the key line, and a
+replace keeps a core tag only when it names the new value's kind (`!!int`
+stays in front of `8081` and refuses in front of `abc`). 95 tests pass and the
+corpus tally is unchanged.
+
 The corpus tally is from [`tests/corpus.rs`](../../../tests/corpus.rs) at
 suite commit [`6ad3d2c`][suite-pin].
 

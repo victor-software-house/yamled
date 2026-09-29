@@ -48,6 +48,16 @@ pub(crate) fn block_header(source: &str, text: usize) -> Option<usize> {
     header
 }
 
+/// Where a comment starts in a line: a `#` that begins the line's content or
+/// follows a space or tab. A `#` inside a word, as in `a#b`, is not one.
+pub(crate) fn comment_start(line: &str) -> Option<usize> {
+    line.char_indices()
+        .find(|&(at, c)| {
+            c == '#' && (line[..at].trim().is_empty() || line[..at].ends_with([' ', '\t']))
+        })
+        .map(|(at, _)| at)
+}
+
 /// The non-empty parts, joined by one space.
 pub(crate) fn spaced(parts: &[&str]) -> String {
     parts

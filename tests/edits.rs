@@ -1106,3 +1106,50 @@ fn a_block_scalar_replaced_by_one_line_keeps_its_header_comment() {
     "};
     assert_eq!(document.as_str(), expected);
 }
+
+#[test]
+fn a_comment_at_the_start_of_a_line_hides_its_colon() {
+    let mut document = doc(indoc! {"
+        ? a
+        # x: y
+        : b
+    "});
+    document.replace(&root().key("a"), "z").unwrap();
+    let expected = indoc! {"
+        ? a
+        # x: y
+        : z
+    "};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
+fn a_tag_stays_only_in_front_of_a_value_it_fits() {
+    let source = indoc! {"
+        port: !!int 8080
+        name: !!str old
+        ports: !!seq
+          - 1
+    "};
+    let mut document = doc(source);
+    assert!(matches!(
+        document.replace(&root().key("port"), "abc"),
+        Err(Error::Unsupported { .. })
+    ));
+    assert!(matches!(
+        document.replace(&root().key("name"), &["a", "b"]),
+        Err(Error::Unsupported { .. })
+    ));
+    assert_eq!(document.as_str(), source);
+    document.replace(&root().key("port"), &8081).unwrap();
+    document.replace(&root().key("name"), "new").unwrap();
+    document.replace(&root().key("ports"), &[2, 3]).unwrap();
+    let expected = indoc! {"
+        port: !!int 8081
+        name: !!str new
+        ports: !!seq
+          - 2
+          - 3
+    "};
+    assert_eq!(document.as_str(), expected);
+}
