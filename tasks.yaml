@@ -1,8 +1,9 @@
 # yaml-language-server: $schema=https://github.com/victor-software-house/qctl/releases/download/v0.4.4/tasks.schema.json
 schema_version: 4
 prefix: YMD
-active: YMD-003
-queue:
+active: null
+queue: []
+archive:
   - id: YMD-003
     title: Property and corpus tests for every edit
     scope: yamled
@@ -12,7 +13,11 @@ queue:
       - A proptest suite applies random replace, insert, push, remove, take, and put edits to generated block documents and checks that the result parses, that bytes outside the splice are unchanged, and that the value read back equals the value written.
       - Every yaml-test-suite input yamled accepts survives a replace of each scalar with its own value, keeping the document's value and every byte outside that node, and an input it refuses fails with an error, not a panic.
       - proptest is a dev-dependency with default features off except what the suite uses, and the suite runs in verify within the time the other tests take.
-    plan: openspec/changes/property-tests/proposal.md
+    plan: openspec/changes/archive/2026-09-28-property-tests/proposal.md
+    completed: 2026-09-29T02:25:01
+    evidence:
+      - 'Released as yamled 0.0.2 (https://crates.io/crates/yamled/0.0.2) from https://github.com/victor-software-house/yamled/pull/5: 98 tests, verify on the build host and in CI, Kody review clean. The corpus test replaces 534 scalars across the yaml-test-suite.'
+    disposition: completed
 
   - id: YMD-002
     title: 'Edit what a ledger formatter needs: key moves, flow lists, re-indent, insert at an index'
@@ -25,10 +30,15 @@ queue:
       - A block sequence is re-indented to a given column with its items, comments, block scalars, and blank lines moved by the same offset.
       - A serialized value is inserted into a sequence at an index in one call, spaced by the sequence's own spacing or the configured Spacing.
       - Each capability has whole-file tests in tests/workflows.rs.
+    plan: openspec/changes/archive/2026-09-28-formatter-edits/proposal.md
+    completed: 2026-09-29T02:25:01
+    evidence:
+      - 'Released as yamled 0.0.2 (https://crates.io/crates/yamled/0.0.2) from https://github.com/victor-software-house/yamled/pull/4, with whole-file tests in tests/workflows.rs; verify on the build host and in CI, Kody review clean.'
+    disposition: completed
     notes:
       - >-
         Found by mapping a work-queue tool's 33 accepted mutation snapshots onto yamled edits: 25 map onto the edits in YMD-001; these four do not. Whitespace tidying (trailing spaces, blank runs) stays in the tool.
-archive:
+
   - id: YMD-001
     title: Edit YAML in place through a location index
     scope: yamled

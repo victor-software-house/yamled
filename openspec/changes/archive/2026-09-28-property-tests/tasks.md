@@ -24,7 +24,7 @@
 The corpus run: 402 inputs, 112 refused at parse, 27 not readable as JSON,
 534 scalars replaced with their value and outside bytes kept, 23 refused as
 unsupported. Defects found and fixed, each with a test in
-[`tests/edits.rs`](../../../tests/edits.rs):
+[`tests/edits.rs`](../../../../tests/edits.rs):
 
 1. A replace dropped the value's anchor or tag.
 2. A replace dropped the key-line comment, or carried it into a block scalar.
@@ -44,7 +44,7 @@ replace keeps a core tag only when it names the new value's kind (`!!int`
 stays in front of `8081` and refuses in front of `abc`). 95 tests pass and the
 corpus tally is unchanged.
 
-The corpus tally is from [`tests/corpus.rs`](../../../tests/corpus.rs) at
+The corpus tally is from [`tests/corpus.rs`](../../../../tests/corpus.rs) at
 suite commit [`6ad3d2c`][suite-pin].
 
 [suite-pin]: https://github.com/yaml/yaml-test-suite/tree/6ad3d2c62885d82fc349026c136ef560838fdf3d
