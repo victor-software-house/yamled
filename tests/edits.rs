@@ -1153,3 +1153,23 @@ fn a_tag_stays_only_in_front_of_a_value_it_fits() {
     "};
     assert_eq!(document.as_str(), expected);
 }
+
+#[test]
+fn a_bare_tag_counts_as_a_string_and_a_dash_comment_is_not_a_tag() {
+    let source = indoc! {"
+        key: ! 123
+        list:
+          - # !!str note
+            5
+    "};
+    let mut document = doc(source);
+    assert!(matches!(
+        document.replace(&root().key("key"), &8081),
+        Err(Error::Unsupported { .. })
+    ));
+    assert_eq!(document.as_str(), source);
+    document.replace(&root().key("key"), "text").unwrap();
+    document.replace(&root().key("list").index(0), &6).unwrap();
+    let back = document.node(&root().key("list").index(0)).unwrap();
+    assert_eq!(back.text(), "6");
+}

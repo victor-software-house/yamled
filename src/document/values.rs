@@ -8,7 +8,7 @@ use serde::Serialize;
 use super::{Document, Fragment};
 use crate::index::Style;
 use crate::render::{self, Rendered, TextStyle};
-use crate::text::{LF, NEWLINE, column, line_end, line_start, spaced, starts_line};
+use crate::text::{LF, NEWLINE, column, comment_start, line_end, line_start, spaced, starts_line};
 use crate::{Error, Path};
 
 /// Where [`Document::insert`] puts a new key.
@@ -195,8 +195,15 @@ impl Document {
                 self.commit_splice(colon, to, &text)
             }
             Some(Style::BlockSequence) => {
-                let before = self.source.get(self.dash(id) + 1..value.start);
-                check_tags(path, before.unwrap_or_default(), rendered)?;
+                let before = self
+                    .source
+                    .get(self.dash(id) + 1..value.start)
+                    .unwrap_or_default();
+                let code: Vec<&str> = before
+                    .lines()
+                    .map(|line| comment_start(line).map_or(line, |at| &line[..at]))
+                    .collect();
+                check_tags(path, &code.join(" "), rendered)?;
                 let text = rendered.after_dash(column(&self.source, self.dash(id)));
                 let lead = if self.source[..value.start].ends_with([' ', '\t']) {
                     ""
@@ -380,16 +387,21 @@ fn node_properties(text: &str) -> String {
 /// Refuse a replace whose kept tags would retype the new value. An anchor
 /// and a local tag (`!name`) always stay; a core tag stays only when it names
 /// the new value's kind, so `!!int` stays in front of `8081` and refuses the
-/// edit in front of `abc`.
+/// edit in front of `abc`. The non-specific tag `!` makes a scalar a string,
+/// so it counts as `!!str`.
 fn check_tags(path: &Path, properties: &str, rendered: &Rendered) -> Result<(), Error> {
     let fits = properties
         .split_whitespace()
         .filter(|token| token.starts_with('!'))
         .all(|tag| {
-            let core = tag.strip_prefix("!!").or_else(|| {
-                tag.strip_prefix("!<tag:yaml.org,2002:")
-                    .and_then(|name| name.strip_suffix('>'))
-            });
+            let core = if tag == "!" {
+                Some("str")
+            } else {
+                tag.strip_prefix("!!").or_else(|| {
+                    tag.strip_prefix("!<tag:yaml.org,2002:")
+                        .and_then(|name| name.strip_suffix('>'))
+                })
+            };
             core.is_none_or(|name| rendered.fits_core_tag(name))
         });
     if fits {
