@@ -1,5 +1,9 @@
 # Changelog
 
+## yamled 0.0.4
+
+- An item whose last block scalar keeps its trailing lines (`|+`) can be taken, put, and reordered with those lines, and removing or inserting a key next to it no longer changes its value.
+
 ## yamled 0.0.3
 
 - An item added after one whose block scalar keeps its trailing lines (`|+`) goes after those lines, so the earlier item keeps its value.
