@@ -165,7 +165,7 @@ impl Document {
                 let on_key_line = value.start <= key_line_content;
                 let block = matches!(self.index.nodes[id].style, Style::Literal | Style::Folded);
                 if on_key_line && !block && rendered.inline_head().is_some() {
-                    check_tags(path, &self.source[colon..value.start], rendered)?;
+                    self.check_tags(path, &self.source[colon..value.start], rendered)?;
                     let from = colon + self.source[colon..value.start].trim_end().len();
                     let text = rendered.after_key_at(key_column, body_column, self.compact);
                     return self.commit_splice(from, value.end, &text);
@@ -179,7 +179,7 @@ impl Document {
                     (spaced(&[&properties, own_line]), comment)
                 };
                 let properties = node_properties(&properties);
-                check_tags(path, &properties, rendered)?;
+                self.check_tags(path, &properties, rendered)?;
                 let to = if on_key_line {
                     value.end.max(key_line_content)
                 } else {
@@ -203,7 +203,7 @@ impl Document {
                     .lines()
                     .map(|line| comment_start(line).map_or(line, |at| &line[..at]))
                     .collect();
-                check_tags(path, &code.join(" "), rendered)?;
+                self.check_tags(path, &code.join(" "), rendered)?;
                 let text = rendered.after_dash(column(&self.source, self.dash(id)));
                 let lead = if self.source[..value.start].ends_with([' ', '\t']) {
                     ""
@@ -217,7 +217,7 @@ impl Document {
                 what: "write a value where a flow collection has none",
             }),
             Some(_) if let Some(head) = rendered.inline_head() => {
-                check_tags(
+                self.check_tags(
                     path,
                     &properties_before(&self.source, value.start),
                     rendered,
@@ -234,7 +234,7 @@ impl Document {
                 what: "write a value into an empty document",
             }),
             None => {
-                check_tags(
+                self.check_tags(
                     path,
                     &properties_before(&self.source, value.start),
                     rendered,
@@ -243,6 +243,54 @@ impl Document {
                 self.commit_splice(value.start, value.end, &text)
             }
         }
+    }
+
+    /// Refuse a replace whose kept tags would retype the new value. An anchor
+    /// and a local tag (`!name`) always stay; a core tag stays only when it
+    /// names the new value's kind, so `!!int` stays in front of `8081` and
+    /// refuses the edit in front of `abc`. The non-specific tag `!` makes a
+    /// scalar a string and leaves a collection as it is, so it fits a string,
+    /// a list, or a map. A `%TAG !!` directive makes `!!` a local handle.
+    fn check_tags(&self, path: &Path, properties: &str, rendered: &Rendered) -> Result<(), Error> {
+        let secondary = if self.redefines_secondary_handle() {
+            None
+        } else {
+            Some("!!")
+        };
+        let fits = properties
+            .split_whitespace()
+            .filter(|token| token.starts_with('!'))
+            .all(|tag| {
+                if tag == "!" {
+                    return ["str", "seq", "map"]
+                        .iter()
+                        .any(|name| rendered.fits_core_tag(name));
+                }
+                secondary
+                    .and_then(|handle| tag.strip_prefix(handle))
+                    .or_else(|| {
+                        tag.strip_prefix("!<tag:yaml.org,2002:")
+                            .and_then(|name| name.strip_suffix('>'))
+                    })
+                    .is_none_or(|name| rendered.fits_core_tag(name))
+            });
+        if fits {
+            Ok(())
+        } else {
+            Err(Error::Unsupported {
+                path: path.clone(),
+                what: "replace a value whose tag does not fit the new value",
+            })
+        }
+    }
+
+    /// Whether a directive before the document's `---` binds `!!` to another
+    /// prefix, so `!!int` no longer names the core type.
+    fn redefines_secondary_handle(&self) -> bool {
+        self.source
+            .lines()
+            .take_while(|line| !line.starts_with("---"))
+            .any(|line| line.split_whitespace().take(2).eq(["%TAG", "!!"]))
     }
 
     /// The column a block scalar's text starts at: the first line under its
@@ -417,35 +465,3 @@ fn properties_before(source: &str, start: usize) -> String {
 }
 
 const FLOW_INDICATORS: [char; 4] = ['[', '{', ',', ':'];
-
-/// Refuse a replace whose kept tags would retype the new value. An anchor
-/// and a local tag (`!name`) always stay; a core tag stays only when it names
-/// the new value's kind, so `!!int` stays in front of `8081` and refuses the
-/// edit in front of `abc`. The non-specific tag `!` makes a scalar a string
-/// and leaves a collection as it is, so it fits a string, a list, or a map.
-fn check_tags(path: &Path, properties: &str, rendered: &Rendered) -> Result<(), Error> {
-    let fits = properties
-        .split_whitespace()
-        .filter(|token| token.starts_with('!'))
-        .all(|tag| {
-            if tag == "!" {
-                return ["str", "seq", "map"]
-                    .iter()
-                    .any(|name| rendered.fits_core_tag(name));
-            }
-            tag.strip_prefix("!!")
-                .or_else(|| {
-                    tag.strip_prefix("!<tag:yaml.org,2002:")
-                        .and_then(|name| name.strip_suffix('>'))
-                })
-                .is_none_or(|name| rendered.fits_core_tag(name))
-        });
-    if fits {
-        Ok(())
-    } else {
-        Err(Error::Unsupported {
-            path: path.clone(),
-            what: "replace a value whose tag does not fit the new value",
-        })
-    }
-}

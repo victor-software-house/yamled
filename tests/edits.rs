@@ -1197,6 +1197,23 @@ fn a_tag_in_a_flow_collection_or_at_the_root_must_fit_too() {
 }
 
 #[test]
+fn a_redefined_secondary_handle_is_not_a_core_tag() {
+    let source = indoc! {"
+        %TAG !! tag:example.com,2000:app/
+        ---
+        port: !!int 1 - 3
+    "};
+    let mut document = doc(source);
+    document.replace(&root().key("port"), "4 - 6").unwrap();
+    let expected = indoc! {"
+        %TAG !! tag:example.com,2000:app/
+        ---
+        port: !!int 4 - 6
+    "};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
 fn a_bare_tag_counts_as_a_string_and_a_dash_comment_is_not_a_tag() {
     let source = indoc! {"
         key: ! 123
