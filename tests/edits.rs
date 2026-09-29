@@ -1236,6 +1236,23 @@ fn a_tag_is_read_through_the_directives_before_the_document() {
 }
 
 #[test]
+fn an_item_added_after_kept_lines_leaves_them_to_their_item() {
+    let mut document = doc(indoc! {"
+        notes: []
+    "});
+    let notes = root().key("notes");
+    document
+        .push_text(&notes, "two trailing\n\n", TextStyle::Literal)
+        .unwrap();
+    document.push_text(&notes, "last", TextStyle::Auto).unwrap();
+    document
+        .push_text(&notes, "after", TextStyle::Auto)
+        .unwrap();
+    let read: BTreeMap<String, Vec<String>> = serde_saphyr::from_str(document.as_str()).unwrap();
+    assert_eq!(read["notes"], ["two trailing\n\n", "last", "after"]);
+}
+
+#[test]
 fn a_bare_tag_counts_as_a_string_and_a_dash_comment_is_not_a_tag() {
     let source = indoc! {"
         key: ! 123

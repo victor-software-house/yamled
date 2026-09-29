@@ -279,7 +279,7 @@ impl Document {
                 } else if let Some(&last) = node.children.last()
                     && index == node.children.len()
                 {
-                    let at = line_end(&self.source, self.index.nodes[last].value.end);
+                    let at = line_end(&self.source, self.item_end(last));
                     let lead = if self.source[..at].ends_with(LF) {
                         ""
                     } else {
@@ -313,7 +313,7 @@ impl Document {
     /// The spacing a sequence's items already share, or the document's.
     fn item_spacing(&self, sequence: usize) -> Spacing {
         let mut gaps = self.index.nodes[sequence].children.windows(2).map(|pair| {
-            let after = line_end(&self.source, self.index.nodes[pair[0]].value.end);
+            let after = line_end(&self.source, self.item_end(pair[0]));
             has_blank_line(
                 &self.source,
                 after,
@@ -600,6 +600,16 @@ impl Document {
             last = child;
         }
         self.keeps_trailing_lines(last)
+    }
+
+    /// Where a sequence item's text ends: the end of its value, or of the
+    /// blank lines its last block scalar keeps (`|+`), which belong to it.
+    fn item_end(&self, id: usize) -> usize {
+        let mut last = id;
+        while let Some(&child) = self.index.nodes[last].children.last() {
+            last = child;
+        }
+        self.kept_end(last).max(self.index.nodes[id].value.end)
     }
 
     /// Whether a node is a block scalar with keep chomping (`|+` or `>+`).
