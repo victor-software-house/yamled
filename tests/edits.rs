@@ -1,6 +1,8 @@
 //! Each edit changes only the bytes it names.
 #![allow(missing_docs)]
 
+use std::collections::BTreeMap;
+
 use indoc::indoc;
 use serde::Serialize;
 use yamled::{Document, Error, Path, Position, TextStyle};
@@ -607,4 +609,46 @@ fn an_empty_value_under_comment_lines_is_refused() {
         Err(Error::Unsupported { .. })
     ));
     assert_eq!(document.as_str(), source);
+}
+
+#[test]
+fn a_replaced_root_collection_starts_at_column_0() {
+    let mut document = doc(indoc! {"
+        - a
+        - b
+    "});
+    document.replace(&root(), &["c", "d", "e"]).unwrap();
+    let expected = indoc! {"
+        - c
+        - d
+        - e
+    "};
+    assert_eq!(document.as_str(), expected);
+    let mut document = doc(indoc! {"
+        a: 1
+        b: 2
+    "});
+    let mapping = BTreeMap::from([("left", 1), ("right", 2)]);
+    document.replace(&root(), &mapping).unwrap();
+    let expected = indoc! {"
+        left: 1
+        right: 2
+    "};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
+fn an_empty_value_on_a_later_line_keeps_its_anchor() {
+    let mut document = doc(indoc! {"
+        queue:
+          &rows [] # none yet
+        copy: *rows
+    "});
+    document.push(&root().key("queue"), "first").unwrap();
+    let expected = indoc! {"
+        queue: &rows # none yet
+          - first
+        copy: *rows
+    "};
+    assert_eq!(document.as_str(), expected);
 }

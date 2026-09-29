@@ -434,34 +434,33 @@ impl Document {
                 path: path.clone(),
                 what: "write a block value inside a flow collection",
             }),
-            None => {
-                let text = rendered.after_dash(0);
-                self.commit_splice(value.start, value.end, &text)
-            }
+            None => self.commit_splice(value.start, value.end, &rendered.at_root()),
         }
     }
 
     /// Write `lines` as the items of an empty value (`[]`, `~`, `null`, or
     /// nothing) under its key. The key line keeps its node properties and
-    /// comment; an empty value on a later line is replaced with its line.
+    /// comment; an empty value on a later line is replaced with its line, and
+    /// its own properties and comment move up to the key line.
     fn fill_empty(&mut self, path: &Path, id: usize, lines: &[String]) -> Result<(), Error> {
         let (colon, key_column) = self.colon(path, id)?;
         let value = self.index.nodes[id].value.clone();
         let key_line_end = line_end(&self.source, colon);
         let key_line_content =
             key_line_end - usize::from(self.source[..key_line_end].ends_with(LF));
-        let (properties, mut comment) = self.key_line_parts(colon, Some(&value));
+        let (mut properties, mut comment) = self.key_line_parts(colon, Some(&value));
         let end = if value.is_empty() || value.end <= key_line_content {
             key_line_end
         } else {
             if value.start > key_line_content {
-                let between = &self.source[key_line_end..line_start(&self.source, value.start)];
-                if !between.trim().is_empty() {
+                let value_line = line_start(&self.source, value.start);
+                if !self.source[key_line_end..value_line].trim().is_empty() {
                     return Err(Error::Unsupported {
                         path: path.clone(),
                         what: "fill an empty value with comment lines above it",
                     });
                 }
+                properties = spaced(&[&properties, self.source[value_line..value.start].trim()]);
             }
             let end = line_end(&self.source, value.end);
             comment = spaced(&[&comment, self.source[value.end..end].trim()]);

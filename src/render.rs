@@ -84,6 +84,15 @@ impl Rendered {
         join(&lines)
     }
 
+    /// The text of a root value: a collection at column 0, a scalar as after a
+    /// dash at column 0.
+    pub(crate) fn at_root(&self) -> String {
+        match self {
+            Self::Scalar { .. } => self.after_dash(0),
+            Self::Sequence(lines) | Self::Mapping(lines) => join(lines),
+        }
+    }
+
     /// The single line of a scalar that fits on one line, such as a flow
     /// value or a key.
     pub(crate) fn inline_head(&self) -> Option<&str> {
