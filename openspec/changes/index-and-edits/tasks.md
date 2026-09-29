@@ -59,6 +59,12 @@ keeps its anchor; `Spacing` and the rule in `specs/edits/spec.md` replace the
 first-two-items guess; [`tests/workflows.rs`](../../../tests/workflows.rs)
 covers the edit sequences of a work-queue tool (add, start, archive, park,
 promote, reorder, re-indent by a move, and print-back identity).
+Then: the value-writing edits moved behind a default `serde` feature, so the
+index and the text moves need `granit-parser` alone, and `check:features`
+runs clippy without it. Each workflow edit reads its value back through
+`serde-saphyr`, and the file is an inline `insta` marked-diff snapshot. A root
+value written after a prefix keeps its column; an empty value tagged as
+anything but `!!seq` is refused.
 
 `deny.toml` now allows `BSD-3-Clause`, for `encoding_rs`, which
 `serde-saphyr`'s `deserialize` feature pulls in through `encoding_rs_io`; the
