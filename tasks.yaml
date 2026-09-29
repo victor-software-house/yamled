@@ -1,8 +1,18 @@
 # yaml-language-server: $schema=https://github.com/victor-software-house/qctl/releases/download/v0.4.4/tasks.schema.json
 schema_version: 4
 prefix: YMD
-active: null
-queue: []
+active: YMD-004
+queue:
+  - id: YMD-004
+    title: Keep a kept block scalar's value through every edit
+    scope: yamled
+    outcome: An item whose last block scalar keeps its trailing lines moves, and its neighbours are edited, with every value unchanged.
+    blocked_by: []
+    acceptance:
+      - take and reorder move such an item instead of refusing it.
+      - remove and insert next to such an item leave its value unchanged.
+      - Each case has a test that reads the values back.
+    plan: openspec/changes/kept-lines/proposal.md
 archive:
   - id: YMD-003
     title: Property and corpus tests for every edit

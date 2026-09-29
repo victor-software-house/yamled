@@ -393,7 +393,7 @@ impl Document {
                 };
             }
         };
-        let at = line_end(&self.source, self.index.nodes[after].value.end);
+        let at = line_end(&self.source, self.item_end(after));
         let lead = if self.source[..at].ends_with(LF) {
             ""
         } else {

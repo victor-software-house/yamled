@@ -1,7 +1,7 @@
 //! Edits that rearrange a block collection's lines without writing values:
 //! reordering its children and moving it to another column.
 
-use super::Document;
+use super::{Document, blank_run_end};
 use crate::index::{Index, Style};
 use crate::path::Segment;
 use crate::text::{LF, column, dedent, line_end, pad, starts_line, terminated};
@@ -12,15 +12,16 @@ impl Document {
     /// `order` names, by index or key, trade places among the slots they
     /// hold, in that order, each with its comments. Children it does not
     /// name, and the blank lines and loose comments between children, stay
-    /// where they are.
+    /// where they are, except blank lines that would land after a child
+    /// whose last block scalar keeps its trailing lines (`|+`), which are
+    /// dropped so that value does not change.
     ///
     /// # Errors
     ///
     /// [`Error::NoNode`] for a missing collection or child,
     /// [`Error::WrongKind`] when the path is not a block collection,
     /// [`Error::Repeated`] for a child named twice, [`Error::Unsupported`]
-    /// for a child that shares its line with its parent's dash or ends in a
-    /// block scalar that keeps its trailing lines (`|+`), and
+    /// for a child that shares its line with its parent's dash, and
     /// [`Error::Invalid`].
     pub fn reorder(&mut self, path: &Path, order: &[Segment]) -> Result<(), Error> {
         let id = self.block_collection(path)?;
@@ -43,15 +44,6 @@ impl Document {
             }
             named.push(slot);
         }
-        if named
-            .iter()
-            .any(|&slot| self.ends_in_kept_lines(children[slot]))
-        {
-            return Err(Error::Unsupported {
-                path: path.clone(),
-                what: "reorder a child that ends in a block scalar keeping its trailing lines",
-            });
-        }
         if let Some(&child) = children.iter().find(|&&child| !self.starts_own_line(child)) {
             return Err(Error::Unsupported {
                 path: path.clone(),
@@ -71,19 +63,32 @@ impl Document {
             .iter()
             .map(|&child| {
                 let start = self.index.owned_start(&self.source, child);
-                (
-                    start,
-                    line_end(&self.source, self.index.nodes[child].value.end),
-                )
+                (start, line_end(&self.source, self.item_end(child)))
             })
             .collect();
-        let (from, to) = (spans[0].0, spans[spans.len() - 1].1);
+        let (from, mut to) = (spans[0].0, spans[spans.len() - 1].1);
         let mut text = String::new();
         for (slot, &child) in placed.iter().enumerate() {
             let (start, end) = spans[child];
-            text.push_str(&terminated(self.source[start..end].trim_end_matches(LF)));
-            if let Some(&(next, _)) = spans.get(slot + 1) {
-                text.push_str(&self.source[spans[slot].1..next]);
+            let written = &self.source[start..end];
+            text.push_str(written);
+            if !written.ends_with(LF) {
+                text.push(LF);
+            }
+            let keeps = self.ends_in_kept_lines(children[child]);
+            match spans.get(slot + 1) {
+                Some(&(next, _)) => {
+                    let gap = &self.source[spans[slot].1..next];
+                    if keeps {
+                        gap.lines()
+                            .filter(|line| !line.trim().is_empty())
+                            .for_each(|line| text.push_str(&terminated(line)));
+                    } else {
+                        text.push_str(gap);
+                    }
+                }
+                None if keeps => to = blank_run_end(&self.source, to),
+                None => {}
             }
         }
         if !self.source[..to].ends_with(LF) {
