@@ -1,7 +1,8 @@
 [settings]
 lockfile = true
+npm.package_manager = "bun"
 
 [task_config]
 includes = [
-  "git::https://github.com/victor-software-house/qctl.git//tasks/q?ref=v0.4.2",
+  "git::https://github.com/victor-software-house/qctl.git//tasks/q?ref=v0.4.4",
 ]

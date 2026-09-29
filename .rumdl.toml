@@ -1,0 +1,16 @@
+# Markdown lint, checked by `mise run lint:md`.
+[global]
+exclude = ["target/**"]
+
+[MD013]
+line-length = 80
+code-blocks = false
+tables = false
+
+[per-file-ignores]
+# A changeset is one release-note paragraph under YAML frontmatter.
+".changeset/*.md" = ["MD013", "MD041"]
+# A one-line import of AGENTS.md.
+"CLAUDE.md" = ["MD041"]
+# OpenSpec delta specs start with their operation heading, not a title.
+"openspec/changes/*/specs/**/spec.md" = ["MD041"]

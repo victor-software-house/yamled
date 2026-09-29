@@ -8,16 +8,17 @@ context: |
   an edit does not name stays as it was.
   First consumer: qctl, which edits tasks.yaml ledgers. ctl-core uses the
   location index to put schema errors on their line.
-  Contracts: AGENTS.md. Work queue: tasks.yaml (YAMLED-###). One openspec
+  Contracts: AGENTS.md. Work queue: tasks.yaml (YMD-###). One openspec
   change maps to one queue row.
   Writing style: plain English, short sentences, numbered lists, no em-dashes,
   no emojis. This repository is public: no local paths, machine names, or
-  private repository names in any artifact.
+  private repository names in any artifact. Every reference is a clickable
+  reference-style link, pinned to a commit for code and files; no bare URLs.
 
 rules:
   proposal:
     - State the measured problem, with numbers where they exist.
-    - Name the YAMLED row the change belongs to.
+    - Name the YMD row the change belongs to.
   specs:
     - Every requirement uses SHALL and has at least one WHEN/THEN scenario.
     - Scenarios quote the exact YAML before and after an edit.
