@@ -274,6 +274,8 @@ impl Document {
                 };
                 if let Some(&child) = node.children.get(index) {
                     let at = self.index.owned_start(&self.source, child);
+                    let kept = lines.last().is_some_and(|line| line.trim().is_empty());
+                    let gap = if kept { "" } else { gap };
                     let text = format!("{block}{LF}{gap}");
                     self.commit_splice(at, at, &text)
                 } else if let Some(&last) = node.children.last()
@@ -284,6 +286,11 @@ impl Document {
                         ""
                     } else {
                         NEWLINE
+                    };
+                    let gap = if self.ends_in_kept_lines(last) {
+                        ""
+                    } else {
+                        gap
                     };
                     let text = format!("{lead}{gap}{block}{LF}");
                     self.commit_splice(at, at, &text)
