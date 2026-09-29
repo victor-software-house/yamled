@@ -56,8 +56,8 @@ mise run verify
 
 `verify` runs, in parallel:
 
-1. Rust: rustfmt, clippy (pedantic, denied), a no-default-features check,
-   nextest, doc-tests, cargo-deny licenses, bans, and sources, and
+1. Rust: rustfmt, clippy (pedantic, denied) with all features and again with
+   none, nextest, doc-tests, cargo-deny licenses, bans, and sources, and
    cargo-machete.
 2. Everything else: taplo for TOML (`.taplo.toml`), rumdl for Markdown
    (`.rumdl.toml`), typos for spelling, actionlint for workflows, and
@@ -68,9 +68,22 @@ through Bun); do not use a global copy. Advisories run on CI only
 (`mise run deny:advisories`). Locally, `.miserc.toml` adds the `mbx` env, which
 routes Cargo through mr-boxington.
 
-Tests put YAML in `indoc!` blocks and bind the expected text before the
-assertion (`let expected = indoc! {...}; assert_eq!(document.as_str(),
-expected);`), so rustfmt keeps each test readable.
+Tests put YAML in `indoc!` blocks. A unit test binds the expected text before
+the assertion (`let expected = indoc! {...}; assert_eq!(document.as_str(),
+expected);`), so rustfmt keeps it readable. A test of an edit sequence goes in
+[`tests/workflows.rs`](tests/workflows.rs): its `Ledger` helper reads each
+edited value back through `serde-saphyr`, and an inline `insta` snapshot
+records the whole file with each line marked `-`, `+`, or kept. Review a
+changed snapshot with `mise run snapshots`.
+
+## Features
+
+`serde` (default) adds the edits that write a value (`replace`, `insert`,
+`push`, and their `_text` forms) and pulls `serde` and `serde-saphyr`. Without
+it the crate needs `granit-parser` alone: the location index, `remove`,
+`take`, and `put`. Anything new that needs a serializer goes under `serde`;
+`check:features` lints the crate without it. Dependencies are declared with
+the features the crate uses, default features off.
 
 ## Git
 

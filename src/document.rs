@@ -1,26 +1,18 @@
 use std::fmt;
 use std::ops::Range;
 
-use serde::Serialize;
-
 use crate::index::{Index, Location, Style};
-use crate::render::{self, Rendered, TextStyle};
 use crate::text::{
     LF, NEWLINE, column, dedent, has_blank_line, indent, join, line_end, line_start, starts_line,
     terminated,
 };
 use crate::{Error, Path};
 
-/// Where [`Document::insert`] puts a new key.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Position<'a> {
-    /// After the mapping's last entry.
-    End,
-    /// Directly before this key, above the comments it owns.
-    Before(&'a str),
-    /// Directly after this key's value.
-    After(&'a str),
-}
+#[cfg(feature = "serde")]
+mod values;
+
+#[cfg(feature = "serde")]
+pub use values::Position;
 
 /// Whether a new sequence item is set off from its neighbours by a blank line,
 /// for a sequence whose own items do not settle it. A sequence whose
@@ -200,30 +192,6 @@ impl Document {
         Some(Node { document: self, id }.value())
     }
 
-    /// Write a value in place of the node at a path. A scalar keeps its style
-    /// when that style can hold the new value.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::NoNode`], [`Error::Serialize`], [`Error::Unsupported`] for a
-    /// block value inside a flow collection, and [`Error::Invalid`].
-    pub fn replace<T: Serialize + ?Sized>(&mut self, path: &Path, value: &T) -> Result<(), Error> {
-        let id = self.id(path)?;
-        let rendered = render::value(value, Some(self.index.nodes[id].style), self.compact)?;
-        self.splice_value(path, id, &rendered)
-    }
-
-    /// Write a string in place of the node at a path, in a chosen style.
-    ///
-    /// # Errors
-    ///
-    /// As [`Document::replace`].
-    pub fn replace_text(&mut self, path: &Path, text: &str, style: TextStyle) -> Result<(), Error> {
-        let id = self.id(path)?;
-        let rendered = render::text(text, style, Some(self.index.nodes[id].style))?;
-        self.splice_value(path, id, &rendered)
-    }
-
     /// Remove the node at a path with its key, the comments it owns, and its
     /// line break. Neighbours keep every byte, including their comments.
     ///
@@ -245,62 +213,6 @@ impl Document {
                 what: "remove from a flow collection",
             }),
         }
-    }
-
-    /// Add a key and value to a block mapping.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::NoNode`], [`Error::WrongKind`] when the path is not a block
-    /// mapping, [`Error::KeyExists`], [`Error::Serialize`], and
-    /// [`Error::Invalid`].
-    pub fn insert<T: Serialize + ?Sized>(
-        &mut self,
-        path: &Path,
-        key: &str,
-        value: &T,
-        position: Position<'_>,
-    ) -> Result<(), Error> {
-        let rendered = render::value(value, None, self.compact)?;
-        self.insert_rendered(path, key, &rendered, position)
-    }
-
-    /// Add a key and a string to a block mapping, in a chosen style.
-    ///
-    /// # Errors
-    ///
-    /// As [`Document::insert`].
-    pub fn insert_text(
-        &mut self,
-        path: &Path,
-        key: &str,
-        text: &str,
-        style: TextStyle,
-        position: Position<'_>,
-    ) -> Result<(), Error> {
-        let rendered = render::text(text, style, None)?;
-        self.insert_rendered(path, key, &rendered, position)
-    }
-
-    /// Append a value to a sequence. An empty `[]` or an empty value becomes
-    /// a block sequence under its key.
-    ///
-    /// # Errors
-    ///
-    /// As [`Document::put`], and [`Error::Serialize`].
-    pub fn push<T: Serialize + ?Sized>(&mut self, path: &Path, value: &T) -> Result<(), Error> {
-        let rendered = render::value(value, None, self.compact)?;
-        self.push_rendered(path, &rendered)
-    }
-
-    /// Append a string to a sequence, in a chosen style.
-    ///
-    /// # Errors
-    ///
-    /// As [`Document::push`].
-    pub fn push_text(&mut self, path: &Path, text: &str, style: TextStyle) -> Result<(), Error> {
-        let rendered = render::text(text, style, None)?;
-        self.push_rendered(path, &rendered)
     }
 
     /// Take a sequence item out, with the comments it owns.
@@ -448,41 +360,11 @@ impl Document {
         ))
     }
 
-    fn splice_value(&mut self, path: &Path, id: usize, rendered: &Rendered) -> Result<(), Error> {
-        let node = &self.index.nodes[id];
-        let value = node.value.clone();
-        let parent_style = node.parent.map(|parent| self.index.nodes[parent].style);
-        match parent_style {
-            Some(Style::BlockMapping) => {
-                let (colon, key_column) = self.colon(path, id)?;
-                let body_column = if rendered.has_indicator() {
-                    key_column + 2
-                } else {
-                    self.block_body_column(id).unwrap_or(key_column + 2)
-                };
-                let text = rendered.after_key_at(key_column, body_column, self.compact);
-                self.commit_splice(colon, value.end, &text)
-            }
-            Some(Style::BlockSequence) => {
-                let text = rendered.after_dash(column(&self.source, self.dash(id)));
-                self.commit_splice(value.start, value.end, &text)
-            }
-            Some(_) if let Some(head) = rendered.inline_head() => {
-                let head = render::flow_safe(head);
-                self.commit_splice(value.start, value.end, &head)
-            }
-            Some(_) => Err(Error::Unsupported {
-                path: path.clone(),
-                what: "write a block value inside a flow collection",
-            }),
-            None => self.commit_splice(value.start, value.end, &rendered.at_root()),
-        }
-    }
-
     /// Write `lines` as the items of an empty value (`[]`, `~`, `null`, or
     /// nothing) under its key. The key line keeps its node properties and
     /// comment; an empty value on a later line is replaced with its line, and
-    /// its own properties and comment move up to the key line.
+    /// its own properties and comment move up to the key line. A tag other
+    /// than `!!seq` would contradict the items, so it is refused.
     fn fill_empty(&mut self, path: &Path, id: usize, lines: &[String]) -> Result<(), Error> {
         let (colon, key_column) = self.colon(path, id)?;
         let value = self.index.nodes[id].value.clone();
@@ -498,7 +380,7 @@ impl Document {
                 if !self.source[key_line_end..value_line].trim().is_empty() {
                     return Err(Error::Unsupported {
                         path: path.clone(),
-                        what: "fill an empty value with comment lines above it",
+                        what: "fill an empty value with lines between it and its key",
                     });
                 }
                 properties = spaced(&[&properties, self.source[value_line..value.start].trim()]);
@@ -507,6 +389,15 @@ impl Document {
             comment = spaced(&[&comment, self.source[value.end..end].trim()]);
             end
         };
+        if properties
+            .split_whitespace()
+            .any(|property| property.starts_with('!') && property != "!!seq")
+        {
+            return Err(Error::Unsupported {
+                path: path.clone(),
+                what: "fill an empty value whose tag is not !!seq",
+            });
+        }
         let head = spaced(&[&properties, &comment]);
         let step = if self.compact { 0 } else { 2 };
         let placed: Vec<String> = std::iter::once(if head.is_empty() {
@@ -535,15 +426,6 @@ impl Document {
             .map(|(at, _)| at);
         let (properties, comment) = rest.split_at(comment_at.unwrap_or(rest.len()));
         (properties.trim().to_owned(), comment.trim().to_owned())
-    }
-
-    /// The column a block scalar's text starts at; the parser's span for a
-    /// block scalar begins at its text, not at the `>` or `|` header. `None`
-    /// for any other node.
-    fn block_body_column(&self, id: usize) -> Option<usize> {
-        let node = &self.index.nodes[id];
-        matches!(node.style, Style::Folded | Style::Literal)
-            .then(|| column(&self.source, node.value.start))
     }
 
     fn remove_entry(&mut self, path: &Path, id: usize, parent: usize) -> Result<(), Error> {
@@ -640,78 +522,6 @@ impl Document {
         self.source[line..at]
             .rfind('-')
             .map_or(at, |offset| line + offset)
-    }
-
-    fn insert_rendered(
-        &mut self,
-        path: &Path,
-        key: &str,
-        rendered: &Rendered,
-        position: Position<'_>,
-    ) -> Result<(), Error> {
-        let id = self.id(path)?;
-        let node = &self.index.nodes[id];
-        if node.style != Style::BlockMapping {
-            return Err(Error::WrongKind {
-                path: path.clone(),
-                expected: "a block mapping",
-            });
-        }
-        if self.index.find(&path.clone().key(key)).is_some() {
-            return Err(Error::KeyExists {
-                path: path.clone().key(key),
-            });
-        }
-        let key_text = render::text(key, TextStyle::Auto, None)?;
-        let key_text = key_text.inline_head().ok_or_else(|| Error::Serialize {
-            message: format!("the key {key:?} needs more than one line"),
-        })?;
-        let key_column = column(&self.source, self.index.entry_start(node.children[0]));
-        let entry = format!(
-            "{key_text}:{}",
-            rendered.after_key(key_column, self.compact)
-        );
-        let pad = " ".repeat(key_column);
-        let anchor = |name: &str| {
-            self.index
-                .find(&path.clone().key(name))
-                .ok_or_else(|| Error::NoNode {
-                    path: path.clone().key(name),
-                })
-        };
-        let after = match position {
-            Position::End => *node.children.last().ok_or_else(|| Error::WrongKind {
-                path: path.clone(),
-                expected: "a mapping with at least one entry",
-            })?,
-            Position::After(name) => anchor(name)?,
-            Position::Before(name) => {
-                let before = anchor(name)?;
-                let start = self.index.entry_start(before);
-                return if starts_line(&self.source, start) {
-                    let at = self.index.owned_start(&self.source, before);
-                    self.commit_splice(at, at, &format!("{pad}{entry}{LF}"))
-                } else {
-                    self.commit_splice(start, start, &format!("{entry}{LF}{pad}"))
-                };
-            }
-        };
-        let at = line_end(&self.source, self.index.nodes[after].value.end);
-        let lead = if self.source[..at].ends_with(LF) {
-            ""
-        } else {
-            NEWLINE
-        };
-        self.commit_splice(at, at, &format!("{lead}{pad}{entry}{LF}"))
-    }
-
-    fn push_rendered(&mut self, path: &Path, rendered: &Rendered) -> Result<(), Error> {
-        let id = self.id(path)?;
-        let length = self.index.nodes[id].children.len();
-        let fragment = Fragment {
-            text: format!("- {}{LF}", rendered.after_dash(0)),
-        };
-        self.put(path, length, &fragment)
     }
 
     fn commit_splice(&mut self, from: usize, to: usize, with: &str) -> Result<(), Error> {

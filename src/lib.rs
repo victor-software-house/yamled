@@ -39,15 +39,27 @@
 //! Every edit parses its result. When the result would not parse, the edit
 //! returns an [`Error`] and the document keeps its old text.
 
+//!
+//! # Features
+//!
+//! - `serde` (default): the edits that write a value, `replace`, `insert`, and
+//!   `push` with their `_text` forms, through `serde` and `serde-saphyr`.
+//!   Without it the crate depends on `granit-parser` alone and keeps the
+//!   location index and the edits that move text: `remove`, `take`, and `put`.
+
 mod document;
 mod error;
 mod index;
 mod path;
+#[cfg(feature = "serde")]
 mod render;
 mod text;
 
-pub use crate::document::{Document, Fragment, Node, Position, Spacing};
+#[cfg(feature = "serde")]
+pub use crate::document::Position;
+pub use crate::document::{Document, Fragment, Node, Spacing};
 pub use crate::error::Error;
 pub use crate::index::{Location, Style};
 pub use crate::path::{Path, Segment};
+#[cfg(feature = "serde")]
 pub use crate::render::TextStyle;

@@ -84,12 +84,21 @@ impl Rendered {
         join(&lines)
     }
 
-    /// The text of a root value: a collection at column 0, a scalar as after a
-    /// dash at column 0.
-    pub(crate) fn at_root(&self) -> String {
+    /// The text of a root value whose first line starts at `column`: a
+    /// collection's other lines line up under it, and a scalar is placed as
+    /// after a dash there.
+    pub(crate) fn at_root(&self, column: usize) -> String {
         match self {
-            Self::Scalar { .. } => self.after_dash(0),
-            Self::Sequence(lines) | Self::Mapping(lines) => join(lines),
+            Self::Scalar { .. } => self.after_dash(column),
+            Self::Sequence(lines) | Self::Mapping(lines) => match lines.split_first() {
+                Some((first, rest)) => {
+                    let lines: Vec<String> = iter::once(first.clone())
+                        .chain(indent(rest, column))
+                        .collect();
+                    join(&lines)
+                }
+                None => String::new(),
+            },
         }
     }
 

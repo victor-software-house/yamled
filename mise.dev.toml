@@ -24,8 +24,8 @@ description = "clippy -D warnings"
 run = "cargo clippy --all-targets --all-features -- -D warnings"
 
 [tasks."check:features"]
-description = "Compile the crate with no default features"
-run = "cargo check --no-default-features"
+description = "Lint the crate and its tests without the serde feature"
+run = "cargo clippy --no-default-features --all-targets -- -D warnings"
 
 [tasks.test]
 description = "Parallel tests via nextest"
@@ -34,6 +34,11 @@ run = "cargo nextest run --all-features"
 [tasks."test:doc"]
 description = "Doc-tests (nextest does not run these)"
 run = "cargo test --doc --all-features"
+
+[tasks.snapshots]
+description = "Review and accept changed snapshots"
+tools = { "github:mitsuhiko/insta" = { version = "1.48.0", exe = "cargo-insta" } }
+run = "cargo insta review"
 
 [tasks.deny]
 description = "License, ban, and source policy (offline)"

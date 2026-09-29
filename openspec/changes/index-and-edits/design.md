@@ -99,6 +99,14 @@ list, which wrote a blank line into a compact file that never had one, and
 inferring from the first two items only, which lost the blank line when one of
 two separated rows moved.
 
+### 9. Writing values is an optional feature
+
+The location index and the edits that move text (`remove`, `take`, `put`)
+need only `granit-parser`. The edits that write a value need `serde` and
+`serde-saphyr`, so they sit behind the default `serde` feature, in their own
+module. A caller that only locates paths, such as a schema error reporter,
+turns default features off and pulls one crate.
+
 ## Risks
 
 1. Flow collections other than an empty `[]` are refused by the edits in this

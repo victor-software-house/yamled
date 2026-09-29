@@ -52,6 +52,7 @@ pub enum Error {
         message: String,
     },
     /// The value could not be serialized.
+    #[cfg(feature = "serde")]
     Serialize {
         /// The serializer's description.
         message: String,
@@ -74,6 +75,7 @@ impl fmt::Display for Error {
             Self::KeyExists { path } => write!(formatter, "{path} already exists"),
             Self::Unsupported { path, what } => write!(formatter, "at {path}: cannot {what} yet"),
             Self::Invalid { message } => write!(formatter, "the edit would not parse: {message}"),
+            #[cfg(feature = "serde")]
             Self::Serialize { message } => {
                 write!(formatter, "cannot serialize the value: {message}")
             }

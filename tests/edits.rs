@@ -652,3 +652,69 @@ fn an_empty_value_on_a_later_line_keeps_its_anchor() {
     "};
     assert_eq!(document.as_str(), expected);
 }
+
+#[test]
+fn a_replaced_root_collection_keeps_its_column() {
+    let mut document = doc(indoc! {"
+        # indented root
+          a: 1
+          b: 2
+    "});
+    let mapping = BTreeMap::from([("left", 1), ("right", 2)]);
+    document.replace(&root(), &mapping).unwrap();
+    let expected = indoc! {"
+        # indented root
+          left: 1
+          right: 2
+    "};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
+fn a_collection_is_refused_on_the_document_marker_line() {
+    let source = indoc! {"
+        --- foo
+    "};
+    let mut document = doc(source);
+    let mapping = BTreeMap::from([("left", 1), ("right", 2)]);
+    let result = document.replace(&root(), &mapping);
+    assert!(matches!(result, Err(Error::Invalid { .. })));
+    assert_eq!(document.as_str(), source);
+}
+
+#[test]
+fn an_empty_value_tagged_as_another_kind_is_not_filled() {
+    for source in [
+        indoc! {"
+            queue: !!null ~
+        "},
+        indoc! {"
+            queue:
+              !!null ~
+        "},
+    ] {
+        let mut document = doc(source);
+        let refused = document.push(&root().key("queue"), "first");
+        assert!(
+            matches!(refused, Err(Error::Unsupported { .. })),
+            "{source}"
+        );
+        assert_eq!(document.as_str(), source);
+    }
+}
+
+#[test]
+fn properties_and_comments_from_both_lines_meet_on_the_key_line() {
+    let mut document = doc(indoc! {"
+        queue: !!seq # a
+          &rows [] # b
+        copy: *rows
+    "});
+    document.push(&root().key("queue"), "first").unwrap();
+    let expected = indoc! {"
+        queue: !!seq &rows # a # b
+          - first
+        copy: *rows
+    "};
+    assert_eq!(document.as_str(), expected);
+}

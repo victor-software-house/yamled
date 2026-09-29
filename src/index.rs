@@ -37,6 +37,7 @@ impl Style {
         matches!(self, Self::BlockSequence | Self::BlockMapping)
     }
 
+    #[cfg(feature = "serde")]
     pub(crate) const fn is_scalar(self) -> bool {
         matches!(
             self,
