@@ -77,13 +77,13 @@ impl Node<'_> {
     }
 
     /// The lines this node owns: its comments above, its entry, and its
-    /// value, with the blank lines a block scalar keeps (`|+`).
+    /// value, with the blank lines its last block scalar keeps (`|+`).
     #[must_use]
     pub fn owned(&self) -> Location {
         let source = &self.document.source;
         let index = &self.document.index;
         let start = index.owned_start(source, self.id);
-        let end = line_end(source, self.document.kept_end(self.id));
+        let end = line_end(source, self.document.item_end(self.id));
         Location::of(source, start..end)
     }
 
@@ -221,14 +221,14 @@ impl Document {
         }
     }
 
-    /// Take a sequence item out, with the comments it owns.
+    /// Take a sequence item out, with the comments it owns and the blank
+    /// lines its last block scalar keeps (`|+`).
     ///
     /// # Errors
     ///
     /// [`Error::NoNode`], [`Error::WrongKind`] when the parent is not a block
     /// sequence, [`Error::Unsupported`] for the only item of a sequence with
-    /// no key or an item that ends in a block scalar keeping its trailing
-    /// lines (`|+`), and [`Error::Invalid`].
+    /// no key, and [`Error::Invalid`].
     pub fn take(&mut self, path: &Path) -> Result<Fragment, Error> {
         let id = self.id(path)?;
         let parent = self.parent(path, id)?;
@@ -236,12 +236,6 @@ impl Document {
             return Err(Error::WrongKind {
                 path: path.clone(),
                 expected: "an item of a block sequence",
-            });
-        }
-        if self.ends_in_kept_lines(id) {
-            return Err(Error::Unsupported {
-                path: path.clone(),
-                what: "take an item that ends in a block scalar keeping its trailing lines",
             });
         }
         let cut = self.cut(path, id, parent)?;
@@ -272,9 +266,9 @@ impl Document {
                     Spacing::Tight => "",
                     Spacing::Blank => NEWLINE,
                 };
+                let kept = lines.last().is_some_and(|line| line.trim().is_empty());
                 if let Some(&child) = node.children.get(index) {
                     let at = self.index.owned_start(&self.source, child);
-                    let kept = lines.last().is_some_and(|line| line.trim().is_empty());
                     let gap = if kept { "" } else { gap };
                     let text = format!("{block}{LF}{gap}");
                     self.commit_splice(at, at, &text)
@@ -292,8 +286,13 @@ impl Document {
                     } else {
                         gap
                     };
+                    let to = if kept {
+                        blank_run_end(&self.source, at)
+                    } else {
+                        at
+                    };
                     let text = format!("{lead}{gap}{block}{LF}");
-                    self.commit_splice(at, at, &text)
+                    self.commit_splice(at, to, &text)
                 } else {
                     Err(Error::NoNode {
                         path: path.clone().index(index),
@@ -440,6 +439,11 @@ impl Document {
                 what: "fill an empty value whose tag is not !!seq",
             });
         }
+        let end = if lines.last().is_some_and(|line| line.trim().is_empty()) {
+            blank_run_end(&self.source, end)
+        } else {
+            end
+        };
         let head = spaced(&[&properties, &comment]);
         let step = if self.compact { 0 } else { 2 };
         let placed: Vec<String> = std::iter::once(if head.is_empty() {
@@ -476,8 +480,18 @@ impl Document {
         }
         let entry = self.index.entry_start(id);
         if starts_line(&self.source, entry) {
+            let previous_keeps = siblings
+                .iter()
+                .position(|&sibling| sibling == id)
+                .and_then(|at| at.checked_sub(1))
+                .is_some_and(|at| self.ends_in_kept_lines(siblings[at]));
             let from = self.index.owned_start(&self.source, id);
-            let to = line_end(&self.source, self.index.nodes[id].value.end);
+            let to = line_end(&self.source, self.item_end(id));
+            let to = if previous_keeps {
+                blank_run_end(&self.source, to)
+            } else {
+                to
+            };
             return self.commit_splice(from, to, "");
         }
         let Some(&[_, next]) = siblings.windows(2).find(|pair| pair[0] == id) else {
@@ -510,7 +524,7 @@ impl Document {
     fn cut(&self, path: &Path, id: usize, parent: usize) -> Result<Cut, Error> {
         let source = &self.source;
         let start = self.index.owned_start(source, id);
-        let end = line_end(source, self.index.nodes[id].value.end);
+        let end = line_end(source, self.item_end(id));
         let text = dedent(&source[start..end], column(source, self.dash(id)));
         let siblings = &self.index.nodes[parent].children;
         if siblings.len() == 1 {
@@ -542,9 +556,7 @@ impl Document {
                 from = previous;
             }
         } else {
-            while to < source.len() && source[to..line_end(source, to)].trim().is_empty() {
-                to = line_end(source, to);
-            }
+            to = blank_run_end(source, to);
         }
         Ok(Cut {
             from,
@@ -609,8 +621,9 @@ impl Document {
         self.keeps_trailing_lines(last)
     }
 
-    /// Where a sequence item's text ends: the end of its value, or of the
-    /// blank lines its last block scalar keeps (`|+`), which belong to it.
+    /// Where a node's text ends: the end of its value, or of the blank lines
+    /// its last block scalar keeps (`|+`), which belong to it. No other blank
+    /// line may follow such a node, since YAML would read it into the value.
     fn item_end(&self, id: usize) -> usize {
         let mut last = id;
         while let Some(&child) = self.index.nodes[last].children.last() {
@@ -695,6 +708,16 @@ fn compact_lists(source: &str, index: &Index) -> bool {
             Some(column(source, dash) == column(source, key.range.start))
         })
         .unwrap_or(false)
+}
+
+/// The start of the first line at or after `at` (a line start) that is not
+/// blank. Blank lines that would land after a block scalar keeping its
+/// trailing lines are dropped, because YAML would read them into it.
+fn blank_run_end(source: &str, mut at: usize) -> usize {
+    while at < source.len() && source[at..line_end(source, at)].trim().is_empty() {
+        at = line_end(source, at);
+    }
+    at
 }
 
 #[cfg(test)]

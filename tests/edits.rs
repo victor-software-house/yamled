@@ -889,7 +889,7 @@ fn text_is_inserted_at_an_index_in_a_chosen_style() {
 }
 
 #[test]
-fn a_node_that_keeps_its_trailing_lines_does_not_move_without_them() {
+fn a_node_that_keeps_its_trailing_lines_moves_with_them() {
     let source = indoc! {"
         rows:
           - note: |+
@@ -898,16 +898,21 @@ fn a_node_that_keeps_its_trailing_lines_does_not_move_without_them() {
           - id: A-2
     "};
     let rows = root().key("rows");
+    let moved = serde_json::json!({"rows": [{"id": "A-2"}, {"note": "kept\n\n"}]});
     let mut document = doc(source);
-    assert!(matches!(
-        document.take(&rows.clone().index(0)),
-        Err(Error::Unsupported { .. })
-    ));
-    assert!(matches!(
-        document.reorder(&rows, &[Segment::Index(1), Segment::Index(0)]),
-        Err(Error::Unsupported { .. })
-    ));
-    assert_eq!(document.as_str(), source);
+    let row = document.take(&rows.clone().index(0)).unwrap();
+    document.put(&rows, 1, &row).unwrap();
+    let read: serde_json::Value = serde_saphyr::from_str(document.as_str()).unwrap();
+    assert_eq!(read, moved);
+
+    let mut document = doc(source);
+    document
+        .reorder(&rows, &[Segment::Index(1), Segment::Index(0)])
+        .unwrap();
+    let read: serde_json::Value = serde_saphyr::from_str(document.as_str()).unwrap();
+    assert_eq!(read, moved);
+
+    let mut document = doc(source);
     document.remove(&rows.index(1)).unwrap();
     let expected = indoc! {"
         rows:
@@ -919,21 +924,23 @@ fn a_node_that_keeps_its_trailing_lines_does_not_move_without_them() {
 }
 
 #[test]
-fn a_kept_scalar_whose_text_starts_with_blank_lines_does_not_move() {
-    let source = indoc! {"
+fn a_kept_scalar_whose_text_starts_with_blank_lines_moves_whole() {
+    let rows = root().key("rows");
+    let mut document = doc(indoc! {"
         rows:
           - note: |+
 
               kept
 
           - id: A-2
-    "};
-    let mut document = doc(source);
-    assert!(matches!(
-        document.take(&root().key("rows").index(0)),
-        Err(Error::Unsupported { .. })
-    ));
-    assert_eq!(document.as_str(), source);
+    "});
+    let row = document.take(&rows.clone().index(0)).unwrap();
+    document.put(&rows, 1, &row).unwrap();
+    let read: serde_json::Value = serde_saphyr::from_str(document.as_str()).unwrap();
+    assert_eq!(
+        read,
+        serde_json::json!({"rows": [{"id": "A-2"}, {"note": "\nkept\n\n"}]})
+    );
 }
 
 #[test]
@@ -1276,6 +1283,118 @@ fn a_blank_line_between_items_is_not_added_to_kept_lines() {
         .unwrap();
     let read: BTreeMap<String, Vec<String>> = serde_saphyr::from_str(document.as_str()).unwrap();
     assert_eq!(read["notes"], ["kept\n\n", "last"]);
+}
+
+#[test]
+fn an_item_that_keeps_its_lines_moves_with_them() {
+    let notes = root().key("notes");
+    let mut document = doc(indoc! {"
+        notes:
+          - a
+          - |+
+            kept
+
+          - c
+    "});
+    let item = document.take(&notes.clone().index(1)).unwrap();
+    document.put(&notes, 0, &item).unwrap();
+    let read: serde_json::Value = serde_saphyr::from_str(document.as_str()).unwrap();
+    assert_eq!(read["notes"], serde_json::json!(["kept\n\n", "a", "c"]));
+
+    let mut document = doc(indoc! {"
+        notes:
+          - a
+          - |+
+            kept
+
+        other: 1
+    "});
+    let item = document.take(&notes.clone().index(1)).unwrap();
+    document.put(&notes, 0, &item).unwrap();
+    let read: serde_json::Value = serde_saphyr::from_str(document.as_str()).unwrap();
+    assert_eq!(read["notes"], serde_json::json!(["kept\n\n", "a"]));
+    assert_eq!(read["other"], 1);
+}
+
+#[test]
+fn a_reorder_drops_the_blank_lines_a_kept_item_would_absorb() {
+    let notes = root().key("notes");
+    let mut document = doc(indoc! {"
+        notes:
+          - a
+
+          - |+
+            kept
+
+          - c
+    "});
+    document
+        .reorder(&notes, &[Segment::Index(1), Segment::Index(0)])
+        .unwrap();
+    let read: serde_json::Value = serde_saphyr::from_str(document.as_str()).unwrap();
+    assert_eq!(read["notes"], serde_json::json!(["kept\n\n", "a", "c"]));
+
+    let mut document = doc(indoc! {"
+        notes:
+          - |+
+            kept
+          - b
+
+        other: 1
+    "});
+    document
+        .reorder(&notes, &[Segment::Index(1), Segment::Index(0)])
+        .unwrap();
+    let read: serde_json::Value = serde_saphyr::from_str(document.as_str()).unwrap();
+    assert_eq!(read["notes"], serde_json::json!(["b", "kept\n"]));
+    assert_eq!(read["other"], 1);
+}
+
+#[test]
+fn an_entry_removed_after_a_kept_scalar_leaves_its_value() {
+    let mut document = doc(indoc! {"
+        a: |+
+          x
+        b: 1
+
+        c: 2
+    "});
+    document.remove(&root().key("b")).unwrap();
+    let expected = indoc! {"
+        a: |+
+          x
+        c: 2
+    "};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
+fn a_key_inserted_after_a_kept_scalar_goes_after_its_lines() {
+    let mut document = doc(indoc! {"
+        a: |+
+          x
+
+        b: 1
+    "});
+    document
+        .insert(&root(), "new", "v", Position::After("a"))
+        .unwrap();
+    let read: serde_json::Value = serde_saphyr::from_str(document.as_str()).unwrap();
+    assert_eq!(read["a"], "x\n\n");
+    assert_eq!(read["new"], "v");
+}
+
+#[test]
+fn an_owned_item_includes_the_lines_its_last_scalar_keeps() {
+    let source = indoc! {"
+        - a: |+
+            x
+
+        - b
+    "};
+    let document = doc(source);
+    let owned = document.node(&root().index(0)).unwrap().owned();
+    assert_eq!(&source[owned.start..owned.end], "- a: |+\n    x\n\n");
 }
 
 #[test]
