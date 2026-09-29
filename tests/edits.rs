@@ -1155,6 +1155,48 @@ fn a_tag_stays_only_in_front_of_a_value_it_fits() {
 }
 
 #[test]
+fn a_tag_in_a_flow_collection_or_at_the_root_must_fit_too() {
+    let source = indoc! {"
+        ports: [!!int 1, !t, 2]
+        named: {a: !!int 1}
+    "};
+    let mut document = doc(source);
+    for path in [root().key("ports").index(0), root().key("named").key("a")] {
+        assert!(matches!(
+            document.replace(&path, "abc"),
+            Err(Error::Unsupported { .. })
+        ));
+    }
+    assert_eq!(document.as_str(), source);
+    document.replace(&root().key("ports").index(0), &5).unwrap();
+    document
+        .replace(&root().key("ports").index(2), "abc")
+        .unwrap();
+    document.replace(&root().key("named").key("a"), &6).unwrap();
+    let expected = indoc! {"
+        ports: [!!int 5, !t, abc]
+        named: {a: !!int 6}
+    "};
+    assert_eq!(document.as_str(), expected);
+
+    let source = indoc! {"
+        --- !!int 5
+    "};
+    let mut document = doc(source);
+    assert!(matches!(
+        document.replace(&root(), "abc"),
+        Err(Error::Unsupported { .. })
+    ));
+    document.replace(&root(), &6).unwrap();
+    assert_eq!(
+        document.as_str(),
+        indoc! {"
+        --- !!int 6
+    "}
+    );
+}
+
+#[test]
 fn a_bare_tag_counts_as_a_string_and_a_dash_comment_is_not_a_tag() {
     let source = indoc! {"
         key: ! 123
@@ -1168,6 +1210,7 @@ fn a_bare_tag_counts_as_a_string_and_a_dash_comment_is_not_a_tag() {
         Err(Error::Unsupported { .. })
     ));
     assert_eq!(document.as_str(), source);
+    document.replace(&root().key("key"), &["a"]).unwrap();
     document.replace(&root().key("key"), "text").unwrap();
     document.replace(&root().key("list").index(0), &6).unwrap();
     let back = document.node(&root().key("list").index(0)).unwrap();

@@ -217,6 +217,11 @@ impl Document {
                 what: "write a value where a flow collection has none",
             }),
             Some(_) if let Some(head) = rendered.inline_head() => {
+                check_tags(
+                    path,
+                    &properties_before(&self.source, value.start),
+                    rendered,
+                )?;
                 let head = render::flow_safe(head);
                 self.commit_splice(value.start, value.end, &head)
             }
@@ -229,6 +234,11 @@ impl Document {
                 what: "write a value into an empty document",
             }),
             None => {
+                check_tags(
+                    path,
+                    &properties_before(&self.source, value.start),
+                    rendered,
+                )?;
                 let text = rendered.at_root(column(&self.source, value.start));
                 self.commit_splice(value.start, value.end, &text)
             }
@@ -384,25 +394,51 @@ fn node_properties(text: &str) -> String {
     properties.join(" ")
 }
 
+/// The anchors and tags written just before `start` in a flow collection or
+/// at the root, read backwards until a token that is not a property. A token
+/// that opens with a flow indicator (`[!!int`) is the last one read; one that
+/// ends with an indicator (`!t,`, `a:`) belongs to an earlier node.
+fn properties_before(source: &str, start: usize) -> String {
+    let mut found = Vec::new();
+    for line in source[..start].lines().rev() {
+        let code = comment_start(line).map_or(line, |at| &line[..at]);
+        for token in code.split_whitespace().rev() {
+            let property = token.trim_start_matches(FLOW_INDICATORS);
+            if token.ends_with(FLOW_INDICATORS) || !property.starts_with(['&', '!']) {
+                return found.join(" ");
+            }
+            found.push(property);
+            if property.len() < token.len() {
+                return found.join(" ");
+            }
+        }
+    }
+    found.join(" ")
+}
+
+const FLOW_INDICATORS: [char; 4] = ['[', '{', ',', ':'];
+
 /// Refuse a replace whose kept tags would retype the new value. An anchor
 /// and a local tag (`!name`) always stay; a core tag stays only when it names
 /// the new value's kind, so `!!int` stays in front of `8081` and refuses the
-/// edit in front of `abc`. The non-specific tag `!` makes a scalar a string,
-/// so it counts as `!!str`.
+/// edit in front of `abc`. The non-specific tag `!` makes a scalar a string
+/// and leaves a collection as it is, so it fits a string, a list, or a map.
 fn check_tags(path: &Path, properties: &str, rendered: &Rendered) -> Result<(), Error> {
     let fits = properties
         .split_whitespace()
         .filter(|token| token.starts_with('!'))
         .all(|tag| {
-            let core = if tag == "!" {
-                Some("str")
-            } else {
-                tag.strip_prefix("!!").or_else(|| {
+            if tag == "!" {
+                return ["str", "seq", "map"]
+                    .iter()
+                    .any(|name| rendered.fits_core_tag(name));
+            }
+            tag.strip_prefix("!!")
+                .or_else(|| {
                     tag.strip_prefix("!<tag:yaml.org,2002:")
                         .and_then(|name| name.strip_suffix('>'))
                 })
-            };
-            core.is_none_or(|name| rendered.fits_core_tag(name))
+                .is_none_or(|name| rendered.fits_core_tag(name))
         });
     if fits {
         Ok(())
