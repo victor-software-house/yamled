@@ -8,6 +8,7 @@ use crate::text::{
 };
 use crate::{Error, Path};
 
+mod arrange;
 #[cfg(feature = "serde")]
 mod values;
 
@@ -194,11 +195,14 @@ impl Document {
 
     /// Remove the node at a path with its key, the comments it owns, and its
     /// line break. Neighbours keep every byte, including their comments.
+    /// An item of a flow sequence written on one line goes with one
+    /// separator, and the last one leaves `[]`.
     ///
     /// # Errors
     ///
     /// [`Error::NoNode`], [`Error::Unsupported`] for a node inside a flow
-    /// collection or the only entry of a mapping, and [`Error::Invalid`].
+    /// mapping or a flow sequence that spans lines, or the only entry of a
+    /// mapping, and [`Error::Invalid`].
     pub fn remove(&mut self, path: &Path) -> Result<(), Error> {
         let id = self.id(path)?;
         let parent = self.parent(path, id)?;
@@ -208,9 +212,10 @@ impl Document {
                 self.commit_splice(cut.from, cut.to, &cut.with)
             }
             Style::BlockMapping => self.remove_entry(path, id, parent),
+            Style::FlowSequence => self.remove_flow_item(path, id, parent),
             _ => Err(Error::Unsupported {
                 path: path.clone(),
-                what: "remove from a flow collection",
+                what: "remove from a flow mapping",
             }),
         }
     }
@@ -221,7 +226,8 @@ impl Document {
     ///
     /// [`Error::NoNode`], [`Error::WrongKind`] when the parent is not a block
     /// sequence, [`Error::Unsupported`] for the only item of a sequence with
-    /// no key, and [`Error::Invalid`].
+    /// no key or an item that ends in a block scalar keeping its trailing
+    /// lines (`|+`), and [`Error::Invalid`].
     pub fn take(&mut self, path: &Path) -> Result<Fragment, Error> {
         let id = self.id(path)?;
         let parent = self.parent(path, id)?;
@@ -229,6 +235,12 @@ impl Document {
             return Err(Error::WrongKind {
                 path: path.clone(),
                 expected: "an item of a block sequence",
+            });
+        }
+        if self.ends_in_kept_lines(id) {
+            return Err(Error::Unsupported {
+                path: path.clone(),
+                what: "take an item that ends in a block scalar keeping its trailing lines",
             });
         }
         let cut = self.cut(path, id, parent)?;
@@ -490,7 +502,12 @@ impl Document {
             });
         }
         let (mut from, mut to) = (start, end);
-        if siblings.last() == Some(&id) {
+        let previous_keeps = siblings
+            .iter()
+            .position(|&sibling| sibling == id)
+            .and_then(|at| at.checked_sub(1))
+            .is_some_and(|at| self.ends_in_kept_lines(siblings[at]));
+        if siblings.last() == Some(&id) && !previous_keeps {
             while from > 0 {
                 let previous = line_start(source, from - 1);
                 if !source[previous..from].trim().is_empty() {
@@ -511,6 +528,76 @@ impl Document {
         })
     }
 
+    fn remove_flow_item(&mut self, path: &Path, id: usize, parent: usize) -> Result<(), Error> {
+        let sequence = self.index.nodes[parent].value.clone();
+        if self.source[sequence.clone()].contains(LF) {
+            return Err(Error::Unsupported {
+                path: path.clone(),
+                what: "remove from a flow sequence that spans lines",
+            });
+        }
+        let children = &self.index.nodes[parent].children;
+        let at = children
+            .iter()
+            .position(|&child| child == id)
+            .unwrap_or_default();
+        let (from, to) = match (at.checked_sub(1), children.get(at + 1)) {
+            (_, Some(_)) => (
+                self.flow_item_start(parent, at),
+                self.flow_item_start(parent, at + 1),
+            ),
+            (Some(previous), None) => (
+                self.index.nodes[children[previous]].value.end,
+                self.index.nodes[id].value.end,
+            ),
+            (None, None) => (sequence.start + 1, sequence.end - 1),
+        };
+        self.commit_splice(from, to, "")
+    }
+
+    /// Where item `k` of a one-line flow sequence begins: after the `[` or
+    /// the comma before it, and the spaces after that.
+    fn flow_item_start(&self, sequence: usize, k: usize) -> usize {
+        let node = &self.index.nodes[sequence];
+        let after = match k.checked_sub(1) {
+            None => node.value.start + 1,
+            Some(previous) => {
+                let end = self.index.nodes[node.children[previous]].value.end;
+                self.source[end..]
+                    .find(',')
+                    .map_or(end, |comma| end + comma + 1)
+            }
+        };
+        let rest = &self.source[after..];
+        after + rest.len() - rest.trim_start_matches(' ').len()
+    }
+
+    /// Whether a node's text ends in a block scalar that keeps its trailing
+    /// line breaks (`|+` or `>+`). The blank lines after such a node are part
+    /// of its value, so they cannot stay behind when it moves. The header is
+    /// the first line above the text that is not blank, since the text may
+    /// start with blank lines.
+    fn ends_in_kept_lines(&self, id: usize) -> bool {
+        let mut last = id;
+        while let Some(&child) = self.index.nodes[last].children.last() {
+            last = child;
+        }
+        let node = &self.index.nodes[last];
+        if !matches!(node.style, Style::Literal | Style::Folded) {
+            return false;
+        }
+        let start = node.value.start;
+        let mut line = line_start(&self.source, start);
+        let mut text = &self.source[line..start];
+        while text.trim().is_empty() && line > 0 {
+            line = line_start(&self.source, line - 1);
+            text = &self.source[line..line_end(&self.source, line)];
+        }
+        text.split_whitespace()
+            .find(|token| token.starts_with(['|', '>']))
+            .is_some_and(|header| header.contains('+'))
+    }
+
     /// The byte of the `-` that starts a sequence item.
     fn dash(&self, id: usize) -> usize {
         self.dash_before(self.index.nodes[id].value.start)
@@ -529,10 +616,14 @@ impl Document {
         let index = Index::build(&edited).map_err(|error| Error::Invalid {
             message: error.to_string(),
         })?;
-        self.compact = compact_lists(&edited, &index);
-        self.source = edited;
-        self.index = index;
+        self.commit(edited, index);
         Ok(())
+    }
+
+    fn commit(&mut self, source: String, index: Index) {
+        self.compact = compact_lists(&source, &index);
+        self.source = source;
+        self.index = index;
     }
 }
 

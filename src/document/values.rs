@@ -22,7 +22,9 @@ pub enum Position<'a> {
 
 impl Document {
     /// Write a value in place of the node at a path. A scalar keeps its style
-    /// when that style can hold the new value.
+    /// when that style can hold the new value, and a flow sequence stays in
+    /// flow style, with its own separator and padding, when every new item
+    /// fits on one line.
     ///
     /// # Errors
     ///
@@ -30,7 +32,15 @@ impl Document {
     /// block value inside a flow collection, and [`Error::Invalid`].
     pub fn replace<T: Serialize + ?Sized>(&mut self, path: &Path, value: &T) -> Result<(), Error> {
         let id = self.id(path)?;
-        let rendered = render::value(value, Some(self.index.nodes[id].style), self.compact)?;
+        let node = &self.index.nodes[id];
+        if node.style == Style::FlowSequence
+            && let Some(items) = render::flow_items(value)?
+        {
+            let range = node.value.clone();
+            let text = self.flow_text(id, &items);
+            return self.commit_splice(range.start, range.end, &text);
+        }
+        let rendered = render::value(value, Some(node.style), self.compact)?;
         self.splice_value(path, id, &rendered)
     }
 
@@ -80,6 +90,39 @@ impl Document {
         self.insert_rendered(path, key, &rendered, position)
     }
 
+    /// Insert a value into a sequence at an index, placed and spaced as
+    /// [`Document::put`] places a fragment. An index equal to the length
+    /// appends.
+    ///
+    /// # Errors
+    ///
+    /// As [`Document::put`], and [`Error::Serialize`].
+    pub fn insert_item<T: Serialize + ?Sized>(
+        &mut self,
+        path: &Path,
+        index: usize,
+        value: &T,
+    ) -> Result<(), Error> {
+        let rendered = render::value(value, None, self.compact)?;
+        self.put_rendered(path, index, &rendered)
+    }
+
+    /// Insert a string into a sequence at an index, in a chosen style.
+    ///
+    /// # Errors
+    ///
+    /// As [`Document::insert_item`].
+    pub fn insert_item_text(
+        &mut self,
+        path: &Path,
+        index: usize,
+        text: &str,
+        style: TextStyle,
+    ) -> Result<(), Error> {
+        let rendered = render::text(text, style, None)?;
+        self.put_rendered(path, index, &rendered)
+    }
+
     /// Append a value to a sequence. An empty `[]` or an empty value becomes
     /// a block sequence under its key.
     ///
@@ -88,7 +131,7 @@ impl Document {
     /// As [`Document::put`], and [`Error::Serialize`].
     pub fn push<T: Serialize + ?Sized>(&mut self, path: &Path, value: &T) -> Result<(), Error> {
         let rendered = render::value(value, None, self.compact)?;
-        self.push_rendered(path, &rendered)
+        self.put_rendered(path, self.length(path), &rendered)
     }
 
     /// Append a string to a sequence, in a chosen style.
@@ -98,7 +141,7 @@ impl Document {
     /// As [`Document::push`].
     pub fn push_text(&mut self, path: &Path, text: &str, style: TextStyle) -> Result<(), Error> {
         let rendered = render::text(text, style, None)?;
-        self.push_rendered(path, &rendered)
+        self.put_rendered(path, self.length(path), &rendered)
     }
 
     fn splice_value(&mut self, path: &Path, id: usize, rendered: &Rendered) -> Result<(), Error> {
@@ -208,12 +251,46 @@ impl Document {
         self.commit_splice(at, at, &format!("{lead}{pad}{entry}{LF}"))
     }
 
-    fn push_rendered(&mut self, path: &Path, rendered: &Rendered) -> Result<(), Error> {
-        let id = self.id(path)?;
-        let length = self.index.nodes[id].children.len();
+    fn put_rendered(
+        &mut self,
+        path: &Path,
+        index: usize,
+        rendered: &Rendered,
+    ) -> Result<(), Error> {
         let fragment = Fragment {
             text: format!("- {}{LF}", rendered.after_dash(0)),
         };
-        self.put(path, length, &fragment)
+        self.put(path, index, &fragment)
+    }
+
+    /// How many items the node at a path holds, or 0 when there is none; a
+    /// missing path fails in [`Document::put`].
+    fn length(&self, path: &Path) -> usize {
+        self.node(path).map_or(0, |node| node.len())
+    }
+
+    /// Flow items laid out as this flow sequence already writes them: its
+    /// separator, and a space inside the brackets when it has one. A list
+    /// that spans lines, or shows no separator, gets `[a, b]`.
+    fn flow_text(&self, id: usize, items: &[String]) -> String {
+        if items.is_empty() {
+            return "[]".to_owned();
+        }
+        let node = &self.index.nodes[id];
+        let written = &self.source[node.value.clone()];
+        let one_line = !written.contains(LF);
+        let separator = match node.children[..] {
+            [first, _, ..] if one_line => {
+                let end = self.index.nodes[first].value.end;
+                &self.source[end..self.flow_item_start(id, 1)]
+            }
+            _ => ", ",
+        };
+        let padding = if one_line && written.starts_with("[ ") {
+            " "
+        } else {
+            ""
+        };
+        format!("[{padding}{}{padding}]", items.join(separator))
     }
 }

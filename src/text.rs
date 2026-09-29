@@ -70,6 +70,20 @@ pub(crate) fn indent(lines: &[String], indent: usize) -> Vec<String> {
         .collect()
 }
 
+/// Add `by` leading spaces to each line that is not empty.
+pub(crate) fn pad(text: &str, by: usize) -> String {
+    let spaces = " ".repeat(by);
+    text.split_inclusive(LF)
+        .map(|line| {
+            if line == NEWLINE {
+                line.to_owned()
+            } else {
+                format!("{spaces}{line}")
+            }
+        })
+        .collect()
+}
+
 /// Remove up to `by` leading spaces from each line.
 pub(crate) fn dedent(text: &str, by: usize) -> String {
     text.split_inclusive(LF)

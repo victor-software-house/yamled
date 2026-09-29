@@ -165,6 +165,50 @@ impl Ledger {
         assert_eq!(self.value(&at), Some(moved.value.clone()), "{at} after put");
     }
 
+    #[track_caller]
+    fn insert_item<T: Serialize + ?Sized>(&mut self, path: &Path, index: usize, value: &T) {
+        self.document
+            .insert_item(path, index, value)
+            .unwrap_or_else(|error| panic!("insert into {path} at {index}: {error}"));
+        let at = path.clone().index(index);
+        assert_eq!(self.value(&at), Some(json(value)), "{at} after insert_item");
+    }
+
+    /// Reorder, then check the value: a mapping's is unchanged, and a
+    /// sequence's named items trade places among their own slots.
+    #[track_caller]
+    fn reorder(&mut self, path: &Path, order: &[Segment]) {
+        let mut expected = self.value(path);
+        if let Some(Value::Array(items)) = &mut expected {
+            let named: Vec<usize> = order
+                .iter()
+                .map(|segment| match segment {
+                    Segment::Index(index) => *index,
+                    Segment::Key(key) => panic!("{key} names no item"),
+                })
+                .collect();
+            let mut slots = named.clone();
+            slots.sort_unstable();
+            let original = items.clone();
+            for (&slot, &child) in slots.iter().zip(&named) {
+                items[slot] = original[child].clone();
+            }
+        }
+        self.document
+            .reorder(path, order)
+            .unwrap_or_else(|error| panic!("reorder {path}: {error}"));
+        assert_eq!(self.value(path), expected, "{path} after reorder");
+    }
+
+    #[track_caller]
+    fn reindent(&mut self, path: &Path, column: usize) {
+        let expected = self.value(&root());
+        self.document
+            .reindent(path, column)
+            .unwrap_or_else(|error| panic!("reindent {path}: {error}"));
+        assert_eq!(self.value(&root()), expected, "the file after reindent");
+    }
+
     /// The whole file, each line marked with what happened to it, under a
     /// count of the lines removed and added.
     fn marked(&self) -> String {
@@ -186,7 +230,9 @@ impl Ledger {
             body.push(mark);
             body.push_str(change.value());
         }
-        format!("# -{removed} +{added}\n{body}")
+        formatdoc! {"
+            # -{removed} +{added}
+            {body}"}
     }
 }
 
@@ -890,6 +936,317 @@ fn a_row_moved_into_an_empty_list_is_indented_to_it() {
     +      on two lines.
     +    acceptance:
     +      - It holds.
+     archive: []
+    ");
+}
+
+fn keys(names: &[&str]) -> Vec<Segment> {
+    names
+        .iter()
+        .map(|name| Segment::Key((*name).to_owned()))
+        .collect()
+}
+
+#[test]
+fn sections_are_reordered_with_the_comments_they_own() {
+    let mut ledger = Ledger::new(indoc! {"
+        active: A-2
+        queue:
+          - id: A-2
+        archive:
+          # owns A-1
+          - id: A-1
+        horizon:
+          - id: A-3
+            title: Someday
+    "});
+    ledger.reorder(&root(), &keys(&["queue", "horizon", "archive"]));
+    insta::assert_snapshot!(ledger.marked(), @"
+    # -3 +3
+     active: A-2
+     queue:
+       - id: A-2
+    +horizon:
+    +  - id: A-3
+    +    title: Someday
+     archive:
+       # owns A-1
+       - id: A-1
+    -horizon:
+    -  - id: A-3
+    -    title: Someday
+    ");
+}
+
+#[test]
+fn a_section_moves_above_the_comment_the_next_key_owns() {
+    let mut ledger = Ledger::new(indoc! {"
+        style:
+          section_order: [queue, horizon, archive]
+
+        queue: []
+
+        # Everything below this line is history, not work.
+        archive:
+          - id: A-1
+        horizon: []
+    "});
+    ledger.reorder(&root(), &keys(&["queue", "horizon", "archive"]));
+    insta::assert_snapshot!(ledger.marked(), @"
+    # -1 +1
+     style:
+       section_order: [queue, horizon, archive]
+     
+     queue: []
+     
+    +horizon: []
+     # Everything below this line is history, not work.
+     archive:
+       - id: A-1
+    -horizon: []
+    ");
+}
+
+#[test]
+fn a_loose_comment_and_blank_lines_stay_in_their_slots() {
+    let mut ledger = Ledger::new(indoc! {"
+        queue: []
+
+        # A note that belongs to no section.
+
+        archive: []
+        horizon: []
+    "});
+    ledger.reorder(&root(), &keys(&["horizon", "archive"]));
+    insta::assert_snapshot!(ledger.marked(), @"
+    # -1 +1
+     queue: []
+     
+     # A note that belongs to no section.
+     
+    +horizon: []
+     archive: []
+    -horizon: []
+    ");
+}
+
+#[test]
+fn a_row_started_moves_to_the_front_keeping_the_blank_line() {
+    let mut ledger = Ledger::new(indoc! {r#"
+        active: A-1
+
+        queue:
+          - id: A-1
+            title: "Quoted: a colon"
+
+          # owns A-2
+          - id: A-2
+            scope: release   # beside a key
+        archive: []
+    "#});
+    ledger.reorder(&queue(), &[Segment::Index(1), Segment::Index(0)]);
+    ledger.replace(&root().key("active"), "A-2");
+    insta::assert_snapshot!(ledger.marked(), @r#"
+    # -4 +4
+    -active: A-1
+    +active: A-2
+     
+     queue:
+    -  - id: A-1
+    -    title: "Quoted: a colon"
+    -
+       # owns A-2
+       - id: A-2
+         scope: release   # beside a key
+    +
+    +  - id: A-1
+    +    title: "Quoted: a colon"
+     archive: []
+    "#);
+}
+
+#[test]
+fn an_archive_is_sorted_newest_first() {
+    let mut ledger = Ledger::new(indoc! {"
+        archive:
+          - id: A-1
+            completed: 2026-08-14T09:00:00
+
+          # owns A-3
+          - id: A-3
+            completed: 2026-08-16T23:08:28
+
+          - id: A-2
+            completed: 2026-08-15T12:30:00
+        horizon: []
+    "});
+    let order = [Segment::Index(1), Segment::Index(2), Segment::Index(0)];
+    ledger.reorder(&root().key("archive"), &order);
+    insta::assert_snapshot!(ledger.marked(), @"
+    # -3 +3
+     archive:
+    -  - id: A-1
+    -    completed: 2026-08-14T09:00:00
+    -
+       # owns A-3
+       - id: A-3
+         completed: 2026-08-16T23:08:28
+     
+       - id: A-2
+         completed: 2026-08-15T12:30:00
+    +
+    +  - id: A-1
+    +    completed: 2026-08-14T09:00:00
+     horizon: []
+    ");
+}
+
+#[test]
+fn rows_written_deeper_than_the_file_are_reindented() {
+    let mut ledger = Ledger::new(indoc! {"
+        queue:
+            # owns A-1
+            - id: A-1
+              outcome: >-
+                Folded text
+                on two lines.
+              acceptance:
+                - It holds.
+
+            - id: A-2
+              notes: |
+                Kept
+                  as written.
+        archive: []
+    "});
+    ledger.reindent(&queue(), 2);
+    insta::assert_snapshot!(ledger.marked(), @"
+    # -11 +11
+     queue:
+    -    # owns A-1
+    -    - id: A-1
+    -      outcome: >-
+    -        Folded text
+    -        on two lines.
+    -      acceptance:
+    -        - It holds.
+    +  # owns A-1
+    +  - id: A-1
+    +    outcome: >-
+    +      Folded text
+    +      on two lines.
+    +    acceptance:
+    +      - It holds.
+     
+    -    - id: A-2
+    -      notes: |
+    -        Kept
+    -          as written.
+    +  - id: A-2
+    +    notes: |
+    +      Kept
+    +        as written.
+     archive: []
+    ");
+}
+
+#[test]
+fn one_of_two_blockers_is_cleared_in_flow_style() {
+    let mut ledger = Ledger::new(indoc! {"
+        queue:
+          - id: A-2
+            blocked_by: [A-1]
+
+          - id: A-3
+            blocked_by: [A-1, A-2]
+    "});
+    ledger.remove(&queue().index(1).key("blocked_by").index(0));
+    ledger.remove(&queue().index(0).key("blocked_by").index(0));
+    insta::assert_snapshot!(ledger.marked(), @"
+    # -2 +2
+     queue:
+       - id: A-2
+    -    blocked_by: [A-1]
+    +    blocked_by: []
+     
+       - id: A-3
+    -    blocked_by: [A-1, A-2]
+    +    blocked_by: [A-2]
+    ");
+}
+
+#[test]
+fn a_flow_list_is_replaced_in_its_own_layout() {
+    let mut ledger = Ledger::new(indoc! {"
+        tags: [ a, b ]
+        tight: [a,b]
+        blocked_by: []
+        rows: [a]
+    "});
+    ledger.replace(&root().key("tags"), &["c", "d: e", "f"]);
+    ledger.replace(&root().key("tight"), &["c", "d"]);
+    ledger.replace(&root().key("blocked_by"), &["A-1"]);
+    let rows = [Row {
+        id: "A-1",
+        title: "Row",
+        blocked_by: Vec::new(),
+        acceptance: vec!["It holds."],
+    }];
+    ledger.replace(&root().key("rows"), &rows);
+    insta::assert_snapshot!(ledger.marked(), @"
+    # -4 +9
+    -tags: [ a, b ]
+    -tight: [a,b]
+    -blocked_by: []
+    -rows: [a]
+    +tags: [ c, 'd: e', f ]
+    +tight: [c,d]
+    +blocked_by: [A-1]
+    +rows:
+    +  - id: A-1
+    +    title: Row
+    +    blocked_by: []
+    +    acceptance:
+    +      - It holds.
+    ");
+}
+
+#[test]
+fn a_new_row_is_inserted_between_rows() {
+    let mut ledger = Ledger::new(indoc! {"
+        queue:
+          - id: A-1
+            acceptance:
+              - It holds.
+
+          # owns A-2
+          - id: A-2
+            acceptance: [It also holds.]
+        archive: []
+    "});
+    let row = Row {
+        id: "A-3",
+        title: "Middle",
+        blocked_by: Vec::new(),
+        acceptance: vec!["It holds."],
+    };
+    ledger.insert_item(&queue(), 1, &row);
+    insta::assert_snapshot!(ledger.marked(), @"
+    # -0 +6
+     queue:
+       - id: A-1
+         acceptance:
+           - It holds.
+     
+    +  - id: A-3
+    +    title: Middle
+    +    blocked_by: []
+    +    acceptance:
+    +      - It holds.
+    +
+       # owns A-2
+       - id: A-2
+         acceptance: [It also holds.]
      archive: []
     ");
 }

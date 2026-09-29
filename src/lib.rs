@@ -38,14 +38,14 @@
 //!
 //! Every edit parses its result. When the result would not parse, the edit
 //! returns an [`Error`] and the document keeps its old text.
-
 //!
 //! # Features
 //!
-//! - `serde` (default): the edits that write a value, `replace`, `insert`, and
-//!   `push` with their `_text` forms, through `serde` and `serde-saphyr`.
-//!   Without it the crate depends on `granit-parser` alone and keeps the
-//!   location index and the edits that move text: `remove`, `take`, and `put`.
+//! - `serde` (default): the edits that write a value, `replace`, `insert`,
+//!   `push`, and `insert_item` with their `_text` forms, through `serde` and
+//!   `serde-saphyr`. Without it the crate depends on `granit-parser` alone and
+//!   keeps the location index and the edits that move text: `remove`, `take`,
+//!   `put`, `reorder`, and `reindent`.
 
 mod document;
 mod error;

@@ -12,8 +12,8 @@ and flow style, and indentation as they were. It is pure Rust, built on
 
 | Feature | Adds | Pulls |
 |:--|:--|:--|
-| (none) | Location index; `remove`, `take`, `put` | `granit-parser` |
-| `serde` (default) | `replace`, `insert`, `push`, and their `_text` forms | `serde`, `serde-saphyr` |
+| (none) | Location index; `remove`, `take`, `put`, `reorder`, `reindent` | `granit-parser` |
+| `serde` (default) | `replace`, `insert`, `push`, `insert_item`, and their `_text` forms | `serde`, `serde-saphyr` |
 
 A caller that only needs the line and column of a path, such as a schema
 error reporter, can depend on `yamled` with `default-features = false`.

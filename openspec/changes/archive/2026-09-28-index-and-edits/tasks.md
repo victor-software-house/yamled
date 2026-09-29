@@ -39,8 +39,8 @@ format, clippy with `-D warnings`, `cargo check --no-default-features`,
 nextest (29 passed), doc-tests (1 passed), cargo-deny licenses, bans, and
 sources, cargo-machete, and `openspec validate --all --strict`.
 `cargo package --locked` built the package. The tests are in
-[`tests/index.rs`](../../../tests/index.rs) and
-[`tests/edits.rs`](../../../tests/edits.rs); the ledger fixture is a copy of
+[`tests/index.rs`](../../../../tests/index.rs) and
+[`tests/edits.rs`](../../../../tests/edits.rs); the ledger fixture is a copy of
 the public [ctl-core ledger][ctl-core-ledger].
 
 2026-09-28, after Kody's review of [yamled#1][yamled#1]: four fixes with a test
@@ -56,7 +56,7 @@ under comment lines is refused. `verify` now also runs taplo, rumdl, typos, and
 actionlint; it passed on the build host with 38 tests and the doc-test.
 Then: a root collection is replaced at column 0; an empty value on a later line
 keeps its anchor; `Spacing` and the rule in `specs/edits/spec.md` replace the
-first-two-items guess; [`tests/workflows.rs`](../../../tests/workflows.rs)
+first-two-items guess; [`tests/workflows.rs`](../../../../tests/workflows.rs)
 covers the edit sequences of a work-queue tool (add, start, archive, park,
 promote, reorder, re-indent by a move, and print-back identity).
 Then: the value-writing edits moved behind a default `serde` feature, so the
