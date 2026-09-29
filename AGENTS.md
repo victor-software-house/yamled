@@ -39,11 +39,11 @@ Multiline strings use `indoc!` and `formatdoc!`. No `concat!`, and no escaped
 
 ## Release
 
-A human writes `.changeset/*.md` on the same PR that ships the behaviour.
-Every changeset is a `patch` bump; do not write `minor` or `major` until the
-operator decides otherwise. Never hand-edit a version or `CHANGELOG.md`. Declarations live in
-[`.ctl/ver.yaml`](.ctl/ver.yaml); verctl opens the Version PR, and merging it
-publishes to crates.io.
+A human writes `.changeset/*.md` on the same PR that ships the behaviour. Every
+changeset is a `patch` bump; do not write `minor` or `major` until the operator
+decides otherwise. Never hand-edit a version or `CHANGELOG.md`. Declarations
+live in [`.ctl/ver.yaml`](.ctl/ver.yaml); verctl opens the Version PR, and
+merging it publishes to crates.io.
 
 ## Checks
 
@@ -51,12 +51,23 @@ publishes to crates.io.
 mise run verify
 ```
 
-`verify` is format, clippy, feature sets, nextest, doc-tests, cargo-deny
-licenses, bans, and sources, cargo-machete, and `openspec validate --all
---strict`. mise pins OpenSpec (`npm:@fission-ai/openspec`, installed through
-Bun); do not use a global `openspec`. Advisories run on CI only
-(`mise run deny:advisories`). Locally, `.miserc.toml` adds the `mbx` env,
-which routes Cargo through mr-boxington.
+`verify` runs, in parallel:
+
+1. Rust: rustfmt, clippy (pedantic, denied), a no-default-features check,
+   nextest, doc-tests, cargo-deny licenses, bans, and sources, and
+   cargo-machete.
+2. Everything else: taplo for TOML (`.taplo.toml`), rumdl for Markdown
+   (`.rumdl.toml`), typos for spelling, actionlint for workflows, and
+   `openspec validate --all --strict`.
+
+mise pins every tool, OpenSpec included (`npm:@fission-ai/openspec`, installed
+through Bun); do not use a global copy. Advisories run on CI only
+(`mise run deny:advisories`). Locally, `.miserc.toml` adds the `mbx` env, which
+routes Cargo through mr-boxington.
+
+Tests put YAML in `indoc!` blocks and bind the expected text before the
+assertion (`let expected = indoc! {...}; assert_eq!(document.as_str(),
+expected);`), so rustfmt keeps each test readable.
 
 ## Git
 

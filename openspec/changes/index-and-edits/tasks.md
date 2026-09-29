@@ -50,6 +50,10 @@ replaced block scalar keeps its indentation). `mise run verify` passed again on
 the build host: 33 tests and the doc-test. After Kody's incremental review: a block
 scalar with an indentation indicator goes two columns under its key; emptying
 or filling a list keeps an anchor or tag on the key line. 36 tests pass.
+After the next incremental review: filling an empty value written on the line
+below its key replaces that line and keeps its comment, and an empty value
+under comment lines is refused. `verify` now also runs taplo, rumdl, typos, and
+actionlint; it passed on the build host with 38 tests and the doc-test.
 
 `deny.toml` now allows `BSD-3-Clause`, for `encoding_rs`, which
 `serde-saphyr`'s `deserialize` feature pulls in through `encoding_rs_io`; the

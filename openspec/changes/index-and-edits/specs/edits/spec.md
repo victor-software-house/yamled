@@ -61,7 +61,8 @@ style: items indented under their key, or at the key's column.
 
 - **WHEN** the row has `notes:` with two items indented six spaces
 - **AND** the caller pushes a third note
-- **THEN** the new item is written as a third line `      - ` with the note
+- **THEN** the note is written as a third item, indented six spaces like the
+  others
 
 #### Scenario: The first row goes into an empty queue
 
