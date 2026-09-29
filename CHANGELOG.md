@@ -1,5 +1,9 @@
 # Changelog
 
+## yamled 0.0.5
+
+- A replace refused by a tag, and a fill of an empty value tagged as something other than a sequence, now fail with `Error::TagMismatch` naming the tag, such as `!!timestamp`, instead of `Error::Unsupported`.
+
 ## yamled 0.0.4
 
 - An item whose last block scalar keeps its trailing lines (`|+`) can be taken, put, and reordered with those lines, and removing or inserting a key next to it no longer changes its value.
