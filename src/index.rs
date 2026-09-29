@@ -3,7 +3,7 @@ use std::ops::Range;
 
 use granit_parser::{Event, Parser, ScalarStyle, StructureStyle};
 
-use crate::text::{LF, line_start, trim_end};
+use crate::text::{LF, block_header, line_end, line_start, trim_end};
 use crate::{Error, Path, Segment};
 
 /// How a node is written in the source.
@@ -168,8 +168,14 @@ impl Builder {
             top.expect_key = false;
             return;
         }
-        let end = trim_end(source, start, end);
-        self.attach(Node::leaf(start..end, scalar_style(style)));
+        let range = match style {
+            ScalarStyle::Literal | ScalarStyle::Folded => match block_header(source, start) {
+                Some(header) => header..block_end(source, header, end),
+                None => start..trim_end(source, start, end),
+            },
+            _ => start..trim_end(source, start, end),
+        };
+        self.attach(Node::leaf(range, scalar_style(style)));
     }
 
     fn open(&mut self, mapping: bool, structure: StructureStyle, start: usize) {
@@ -328,6 +334,36 @@ impl Index {
         }
         start
     }
+}
+
+/// Where a block scalar's last content line ends. The parser's span runs on
+/// to the next token, over blank lines and the next line's indentation. A
+/// line is content when it holds text, or holds only spaces that reach past
+/// the text's indentation; a block with no content ends at its header.
+fn block_end(source: &str, header: usize, span_end: usize) -> usize {
+    let header_end = header
+        + source[header..]
+            .find(char::is_whitespace)
+            .unwrap_or(source.len() - header);
+    let body = line_end(source, header_end);
+    let region = source.get(body..span_end).unwrap_or_default();
+    let Some(indent) = region
+        .lines()
+        .find(|line| !line.trim().is_empty())
+        .map(|line| line.len() - line.trim_start().len())
+    else {
+        return header_end;
+    };
+    let mut end = header_end;
+    let mut at = body;
+    for line in region.split_inclusive(LF) {
+        let content = line.trim_end_matches(LF);
+        if !content.trim().is_empty() || content.len() > indent {
+            end = at + content.len();
+        }
+        at += line.len();
+    }
+    end
 }
 
 fn scalar_style(style: ScalarStyle) -> Style {

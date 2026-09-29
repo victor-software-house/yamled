@@ -3,8 +3,8 @@ use std::ops::Range;
 
 use crate::index::{Index, Location, Style};
 use crate::text::{
-    LF, NEWLINE, column, dedent, has_blank_line, indent, join, line_end, line_start, starts_line,
-    terminated,
+    LF, NEWLINE, column, comment_start, dash_before, dedent, has_blank_line, indent, join,
+    line_end, line_start, spaced, starts_line, terminated,
 };
 use crate::{Error, Path};
 
@@ -76,13 +76,14 @@ impl Node<'_> {
         Some(Location::of(&self.document.source, key.range.clone()))
     }
 
-    /// The lines this node owns: its comments above, its entry, and its value.
+    /// The lines this node owns: its comments above, its entry, and its
+    /// value, with the blank lines a block scalar keeps (`|+`).
     #[must_use]
     pub fn owned(&self) -> Location {
         let source = &self.document.source;
         let index = &self.document.index;
         let start = index.owned_start(source, self.id);
-        let end = line_end(source, index.nodes[self.id].value.end);
+        let end = line_end(source, self.document.kept_end(self.id));
         Location::of(source, start..end)
     }
 
@@ -262,7 +263,10 @@ impl Document {
         let lines: Vec<String> = fragment.text.lines().map(str::to_owned).collect();
         match node.style {
             Style::BlockSequence => {
-                let dash = column(&self.source, node.value.start);
+                let dash = node.children.first().map_or_else(
+                    || column(&self.source, node.value.start),
+                    |&first| column(&self.source, self.dash(first)),
+                );
                 let block = join(&indent(&lines, dash));
                 let gap = match self.item_spacing(id) {
                     Spacing::Tight => "",
@@ -353,7 +357,9 @@ impl Document {
         }
     }
 
-    /// The byte after a mapping value's `:`, and the key's column.
+    /// The byte after a mapping value's `:`, and the key's column. The `:`
+    /// is looked for between the key and its value, or on the key's line
+    /// for an empty value, and never inside a comment.
     fn colon(&self, path: &Path, id: usize) -> Result<(usize, usize), Error> {
         let key = self.index.nodes[id]
             .key
@@ -362,9 +368,26 @@ impl Document {
                 path: path.clone(),
                 what: "fill an empty value that has no key",
             })?;
-        let after = &self.source[key.range.end..];
-        let offset = after.find(':').ok_or_else(|| Error::Invalid {
-            message: format!("no ':' after the key at {path}"),
+        let value = &self.index.nodes[id].value;
+        let limit = if value.start > key.range.end {
+            value.start
+        } else {
+            line_end(&self.source, key.range.end)
+        };
+        let after = &self.source[key.range.end..limit];
+        let mut line_offset = 0;
+        let mut found = None;
+        for line in after.split_inclusive(LF) {
+            let code = comment_start(line).map_or(line, |comment| &line[..comment]);
+            if let Some(colon) = code.find(':') {
+                found = Some(line_offset + colon);
+                break;
+            }
+            line_offset += line.len();
+        }
+        let offset = found.ok_or_else(|| Error::Unsupported {
+            path: path.clone(),
+            what: "write the value of a key with no ':' after it",
         })?;
         Ok((
             key.range.end + offset + 1,
@@ -432,11 +455,7 @@ impl Document {
         if let Some(value) = value.filter(|value| (colon..line_content).contains(&value.start)) {
             rest.replace_range(value.start - colon..value.end.min(line_content) - colon, "");
         }
-        let comment_at = rest
-            .char_indices()
-            .find(|&(at, c)| c == '#' && (at == 0 || rest[..at].ends_with([' ', '\t'])))
-            .map(|(at, _)| at);
-        let (properties, comment) = rest.split_at(comment_at.unwrap_or(rest.len()));
+        let (properties, comment) = rest.split_at(comment_start(&rest).unwrap_or(rest.len()));
         (properties.trim().to_owned(), comment.trim().to_owned())
     }
 
@@ -464,7 +483,7 @@ impl Document {
         let comments_start = self.index.owned_start(&self.source, next);
         let comments_end = line_start(&self.source, next_entry);
         let line = line_start(&self.source, entry);
-        let dash_column = column(&self.source, self.dash_before(entry));
+        let dash_column = column(&self.source, dash_before(&self.source, entry));
         let comments: Vec<String> = self.source[comments_start..comments_end]
             .lines()
             .map(|comment| comment.trim_start().to_owned())
@@ -574,41 +593,50 @@ impl Document {
 
     /// Whether a node's text ends in a block scalar that keeps its trailing
     /// line breaks (`|+` or `>+`). The blank lines after such a node are part
-    /// of its value, so they cannot stay behind when it moves. The header is
-    /// the first line above the text that is not blank, since the text may
-    /// start with blank lines.
+    /// of its value, so they cannot stay behind when it moves.
     fn ends_in_kept_lines(&self, id: usize) -> bool {
         let mut last = id;
         while let Some(&child) = self.index.nodes[last].children.last() {
             last = child;
         }
-        let node = &self.index.nodes[last];
-        if !matches!(node.style, Style::Literal | Style::Folded) {
-            return false;
+        self.keeps_trailing_lines(last)
+    }
+
+    /// Whether a node is a block scalar with keep chomping (`|+` or `>+`).
+    fn keeps_trailing_lines(&self, id: usize) -> bool {
+        let node = &self.index.nodes[id];
+        matches!(node.style, Style::Literal | Style::Folded)
+            && self.source[node.value.start..]
+                .split_whitespace()
+                .next()
+                .is_some_and(|header| header.contains('+'))
+    }
+
+    /// Where a node's value ends, including the blank lines after a block
+    /// scalar that keeps them: the index trims those, but they are part of
+    /// its value, so a replace must take them.
+    fn kept_end(&self, id: usize) -> usize {
+        let mut end = self.index.nodes[id].value.end;
+        if !self.keeps_trailing_lines(id) {
+            return end;
         }
-        let start = node.value.start;
-        let mut line = line_start(&self.source, start);
-        let mut text = &self.source[line..start];
-        while text.trim().is_empty() && line > 0 {
-            line = line_start(&self.source, line - 1);
-            text = &self.source[line..line_end(&self.source, line)];
+        loop {
+            let next = line_end(&self.source, end);
+            if next >= self.source.len() {
+                break;
+            }
+            let line = &self.source[next..line_end(&self.source, next)];
+            if !line.trim().is_empty() {
+                break;
+            }
+            end = next + line.trim_end_matches(LF).len();
         }
-        text.split_whitespace()
-            .find(|token| token.starts_with(['|', '>']))
-            .is_some_and(|header| header.contains('+'))
+        end
     }
 
     /// The byte of the `-` that starts a sequence item.
     fn dash(&self, id: usize) -> usize {
-        self.dash_before(self.index.nodes[id].value.start)
-    }
-
-    /// The byte of the last `-` on the line before `at`, or `at` itself.
-    fn dash_before(&self, at: usize) -> usize {
-        let line = line_start(&self.source, at);
-        self.source[line..at]
-            .rfind('-')
-            .map_or(at, |offset| line + offset)
+        dash_before(&self.source, self.index.nodes[id].value.start)
     }
 
     fn commit_splice(&mut self, from: usize, to: usize, with: &str) -> Result<(), Error> {
@@ -634,18 +662,10 @@ impl fmt::Display for Document {
     }
 }
 
-/// The non-empty parts, joined by one space.
-fn spaced(parts: &[&str]) -> String {
-    parts
-        .iter()
-        .copied()
-        .filter(|part| !part.is_empty())
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
 /// Whether the file writes list items at their key's column rather than
-/// under it, judged from the first block list that is a mapping value.
+/// under it, judged from the first block list that is a mapping value. The
+/// parser starts such a list's span at its first item's value, so the column
+/// is read from that item's dash.
 fn compact_lists(source: &str, index: &Index) -> bool {
     index
         .nodes
@@ -653,7 +673,9 @@ fn compact_lists(source: &str, index: &Index) -> bool {
         .find(|node| node.style == Style::BlockSequence && node.key.is_some())
         .and_then(|node| {
             let key = node.key.as_ref()?;
-            Some(column(source, node.value.start) == column(source, key.range.start))
+            let first = index.nodes.get(*node.children.first()?)?;
+            let dash = dash_before(source, first.value.start);
+            Some(column(source, dash) == column(source, key.range.start))
         })
         .unwrap_or(false)
 }

@@ -1,0 +1,4 @@
+# Spelling, checked by `mise run lint:typos`.
+[files]
+# The YAML test suite is upstream data, pinned as a submodule.
+extend-exclude = ["tests/yaml-test-suite"]

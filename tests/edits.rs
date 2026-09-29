@@ -935,3 +935,323 @@ fn a_kept_scalar_whose_text_starts_with_blank_lines_does_not_move() {
     ));
     assert_eq!(document.as_str(), source);
 }
+
+#[test]
+fn a_replaced_value_keeps_its_anchor_and_the_key_line_comment() {
+    let mut document = doc(indoc! {"
+        key: &shared old # note
+        copy: *shared
+        list: # rows
+          - a
+    "});
+    document.replace(&root().key("key"), "new").unwrap();
+    document.replace(&root().key("list"), "none").unwrap();
+    let expected = indoc! {"
+        key: &shared new # note
+        copy: *shared
+        list: none # rows
+    "};
+    assert_eq!(document.as_str(), expected);
+    document.replace(&root().key("key"), &["x", "z"]).unwrap();
+    let expected = indoc! {"
+        key: &shared # note
+          - x
+          - z
+        copy: *shared
+        list: none # rows
+    "};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
+fn a_row_goes_into_a_list_written_at_its_keys_column() {
+    let mut document = doc(indoc! {"
+        rows:
+        - id: A-1
+          note: plain
+    "});
+    let row = BTreeMap::from([("id", "A-0"), ("note", "new")]);
+    document.insert_item(&root().key("rows"), 0, &row).unwrap();
+    let expected = indoc! {"
+        rows:
+        - id: A-0
+          note: new
+        - id: A-1
+          note: plain
+    "};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
+fn a_block_scalar_item_or_root_is_replaced_with_its_header() {
+    let mut document = doc(indoc! {"
+        - |
+          old text
+        - kept
+    "});
+    document
+        .replace_text(&root().index(0), "new text", TextStyle::Folded)
+        .unwrap();
+    let expected = indoc! {"
+        - >-
+          new text
+        - kept
+    "};
+    assert_eq!(document.as_str(), expected);
+    let mut document = doc(indoc! {"
+        --- >
+          folded
+    "});
+    document.replace(&root(), "kept folded").unwrap();
+    let expected = indoc! {"
+        --- >-
+              kept folded
+    "};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
+fn an_empty_value_is_written_after_its_colon() {
+    let mut document = doc(indoc! {"
+        a:
+        b: 2
+    "});
+    document.replace(&root().key("a"), "one").unwrap();
+    let expected = indoc! {"
+        a: one
+        b: 2
+    "};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
+fn a_kept_scalar_is_replaced_with_the_blank_lines_it_owns() {
+    let mut document = doc(indoc! {"
+        keep: |+
+          text
+
+        next: 1
+    "});
+    document
+        .replace_text(&root().key("keep"), "new\n\n", TextStyle::Auto)
+        .unwrap();
+    let expected = indoc! {"
+        keep: |+
+          new
+
+        next: 1
+    "};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
+fn an_empty_block_scalar_is_replaced_without_touching_the_next_key() {
+    let mut document = doc(indoc! {"
+        clip: >
+
+        next: 1
+    "});
+    document.replace(&root().key("clip"), "text").unwrap();
+    let expected = indoc! {"
+        clip: >-
+          text
+
+        next: 1
+    "};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
+fn an_empty_tagged_item_gets_its_value_after_a_space() {
+    let mut document = doc(indoc! {"
+        - !!str
+        - b
+    "});
+    document.replace(&root().index(0), "a").unwrap();
+    let expected = indoc! {"
+        - !!str a
+        - b
+    "};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
+fn an_explicit_key_with_a_comment_finds_its_colon_on_the_next_line() {
+    let mut document = doc(indoc! {"
+        ? a # c
+        : b
+    "});
+    document.replace(&root().key("a"), "z").unwrap();
+    let expected = indoc! {"
+        ? a # c
+        : z
+    "};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
+fn a_block_scalar_replaced_by_one_line_keeps_its_header_comment() {
+    let mut document = doc(indoc! {"
+        key: | # note
+          old
+        next: 1
+    "});
+    document
+        .replace_text(&root().key("key"), "new", TextStyle::Auto)
+        .unwrap();
+    let expected = indoc! {"
+        key: |- # note
+          new
+        next: 1
+    "};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
+fn a_comment_at_the_start_of_a_line_hides_its_colon() {
+    let mut document = doc(indoc! {"
+        ? a
+        # x: y
+        : b
+    "});
+    document.replace(&root().key("a"), "z").unwrap();
+    let expected = indoc! {"
+        ? a
+        # x: y
+        : z
+    "};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
+fn a_tag_stays_only_in_front_of_a_value_it_fits() {
+    let source = indoc! {"
+        port: !!int 8080
+        name: !!str old
+        ports: !!seq
+          - 1
+    "};
+    let mut document = doc(source);
+    assert!(matches!(
+        document.replace(&root().key("port"), "abc"),
+        Err(Error::Unsupported { .. })
+    ));
+    assert!(matches!(
+        document.replace(&root().key("name"), &["a", "b"]),
+        Err(Error::Unsupported { .. })
+    ));
+    assert_eq!(document.as_str(), source);
+    document.replace(&root().key("port"), &8081).unwrap();
+    document.replace(&root().key("name"), "new").unwrap();
+    document.replace(&root().key("ports"), &[2, 3]).unwrap();
+    let expected = indoc! {"
+        port: !!int 8081
+        name: !!str new
+        ports: !!seq
+          - 2
+          - 3
+    "};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
+fn a_tag_in_a_flow_collection_or_at_the_root_must_fit_too() {
+    let source = indoc! {"
+        ports: [!!int 1, !t, 2]
+        named: {a: !!int 1}
+    "};
+    let mut document = doc(source);
+    for path in [root().key("ports").index(0), root().key("named").key("a")] {
+        assert!(matches!(
+            document.replace(&path, "abc"),
+            Err(Error::Unsupported { .. })
+        ));
+    }
+    assert_eq!(document.as_str(), source);
+    document.replace(&root().key("ports").index(0), &5).unwrap();
+    document
+        .replace(&root().key("ports").index(2), "abc")
+        .unwrap();
+    document.replace(&root().key("named").key("a"), &6).unwrap();
+    let expected = indoc! {"
+        ports: [!!int 5, !t, abc]
+        named: {a: !!int 6}
+    "};
+    assert_eq!(document.as_str(), expected);
+
+    let source = indoc! {"
+        --- !!int 5
+    "};
+    let mut document = doc(source);
+    assert!(matches!(
+        document.replace(&root(), "abc"),
+        Err(Error::Unsupported { .. })
+    ));
+    document.replace(&root(), &6).unwrap();
+    assert_eq!(
+        document.as_str(),
+        indoc! {"
+        --- !!int 6
+    "}
+    );
+}
+
+#[test]
+fn a_tag_is_read_through_the_directives_before_the_document() {
+    let source = indoc! {"
+        %TAG !! tag:example.com,2000:app/
+        ---
+        port: !!int 1 - 3
+    "};
+    let mut document = doc(source);
+    document.replace(&root().key("port"), "4 - 6").unwrap();
+    let expected = indoc! {"
+        %TAG !! tag:example.com,2000:app/
+        ---
+        port: !!int 4 - 6
+    "};
+    assert_eq!(document.as_str(), expected);
+
+    let source = indoc! {"
+        %TAG !e! tag:yaml.org,2002:
+        ---
+        port: !e!int 1
+    "};
+    let mut document = doc(source);
+    assert!(matches!(
+        document.replace(&root().key("port"), "abc"),
+        Err(Error::Unsupported { .. })
+    ));
+
+    let source = indoc! {"
+        port: !!int 1
+        text: |
+          %TAG !! tag:example.com,2000:app/
+    "};
+    let mut document = doc(source);
+    assert!(matches!(
+        document.replace(&root().key("port"), "abc"),
+        Err(Error::Unsupported { .. })
+    ));
+}
+
+#[test]
+fn a_bare_tag_counts_as_a_string_and_a_dash_comment_is_not_a_tag() {
+    let source = indoc! {"
+        key: ! 123
+        list:
+          - # !!str note
+            5
+    "};
+    let mut document = doc(source);
+    assert!(matches!(
+        document.replace(&root().key("key"), &8081),
+        Err(Error::Unsupported { .. })
+    ));
+    assert_eq!(document.as_str(), source);
+    document.replace(&root().key("key"), &["a"]).unwrap();
+    document.replace(&root().key("key"), "text").unwrap();
+    document.replace(&root().key("list").index(0), &6).unwrap();
+    let back = document.node(&root().key("list").index(0)).unwrap();
+    assert_eq!(back.text(), "6");
+}
