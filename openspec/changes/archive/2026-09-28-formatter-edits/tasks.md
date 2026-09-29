@@ -32,5 +32,5 @@ the comment the next key owns, a loose comment kept in its slot, a started row
 moved to the front with its blank line, an archive sorted newest first, rows
 re-indented from four columns to two with a literal block, blockers removed in
 flow style, flow lists replaced in their own layout, and a row inserted at an
-index. The tests are in [`tests/workflows.rs`](../../../tests/workflows.rs)
-and [`tests/edits.rs`](../../../tests/edits.rs).
+index. The tests are in [`tests/workflows.rs`](../../../../tests/workflows.rs)
+and [`tests/edits.rs`](../../../../tests/edits.rs).
