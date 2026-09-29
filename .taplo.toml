@@ -1,2 +1,2 @@
 # TOML formatting, checked by `mise run format:toml`.
-exclude = ["target/**"]
+exclude = ["target/**", "tests/yaml-test-suite/**"]

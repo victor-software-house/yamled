@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::Error;
 use crate::index::{Index, Style};
-use crate::text::{LF, indent, join, terminated};
+use crate::text::{LF, indent, join, spaced, terminated};
 
 /// How a string should be written when the caller has a preference.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -59,10 +59,32 @@ impl Rendered {
         body_column: usize,
         compact: bool,
     ) -> String {
+        self.after_key_with(key_column, body_column, compact, "", "")
+    }
+
+    /// As [`Self::after_key_at`], with node properties such as `&anchor`
+    /// before the value and a comment at the end of the key line.
+    pub(crate) fn after_key_with(
+        &self,
+        key_column: usize,
+        body_column: usize,
+        compact: bool,
+        properties: &str,
+        comment: &str,
+    ) -> String {
         let (first, rest, column) = match self {
-            Self::Scalar { head, body } => (format!(" {head}"), body, body_column),
-            Self::Sequence(lines) if compact => (String::new(), lines, key_column),
-            Self::Sequence(lines) | Self::Mapping(lines) => (String::new(), lines, key_column + 2),
+            Self::Scalar { head, body } => {
+                (spaced(&[properties, head, comment]), body, body_column)
+            }
+            Self::Sequence(lines) if compact => (spaced(&[properties, comment]), lines, key_column),
+            Self::Sequence(lines) | Self::Mapping(lines) => {
+                (spaced(&[properties, comment]), lines, key_column + 2)
+            }
+        };
+        let first = if first.is_empty() {
+            first
+        } else {
+            format!(" {first}")
         };
         let lines: Vec<String> = iter::once(first).chain(indent(rest, column)).collect();
         join(&lines)

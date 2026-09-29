@@ -1,8 +1,19 @@
 # yaml-language-server: $schema=https://github.com/victor-software-house/qctl/releases/download/v0.4.4/tasks.schema.json
 schema_version: 4
 prefix: YMD
-active: YMD-002
+active: YMD-003
 queue:
+  - id: YMD-003
+    title: Property and corpus tests for every edit
+    scope: yamled
+    outcome: Random edits over generated documents and the public yaml-test-suite prove each edit's invariants, not only the cases someone thought to write.
+    blocked_by: []
+    acceptance:
+      - A proptest suite applies random replace, insert, push, remove, take, and put edits to generated block documents and checks that the result parses, that bytes outside the splice are unchanged, and that the value read back equals the value written.
+      - Every yaml-test-suite input yamled accepts survives a replace of each scalar with its own value, keeping the document's value and every byte outside that node, and an input it refuses fails with an error, not a panic.
+      - proptest is a dev-dependency with default features off except what the suite uses, and the suite runs in verify within the time the other tests take.
+    plan: openspec/changes/property-tests/proposal.md
+
   - id: YMD-002
     title: 'Edit what a ledger formatter needs: key moves, flow lists, re-indent, insert at an index'
     scope: yamled
@@ -17,16 +28,6 @@ queue:
     notes:
       - >-
         Found by mapping a work-queue tool's 33 accepted mutation snapshots onto yamled edits: 25 map onto the edits in YMD-001; these four do not. Whitespace tidying (trailing spaces, blank runs) stays in the tool.
-
-  - id: YMD-003
-    title: Property and corpus tests for every edit
-    scope: yamled
-    outcome: Random edits over generated documents and the public yaml-test-suite prove each edit's invariants, not only the cases someone thought to write.
-    blocked_by: []
-    acceptance:
-      - A proptest suite applies random replace, insert, push, remove, take, and put edits to generated block documents and checks that the result parses, that bytes outside the splice are unchanged, and that the value read back equals the value written.
-      - Every yaml-test-suite input yamled accepts survives a replace of each scalar with its own value byte-identical, and an input it refuses fails with an error, not a panic.
-      - proptest is a dev-dependency with default features off except what the suite uses, and the suite runs in verify within the time the other tests take.
 archive:
   - id: YMD-001
     title: Edit YAML in place through a location index

@@ -76,6 +76,15 @@ edited value back through `serde-saphyr`, and an inline `insta` snapshot
 records the whole file with each line marked `-`, `+`, or kept. Review a
 changed snapshot with `mise run snapshots`.
 
+[`tests/properties.rs`](tests/properties.rs) runs random edit sequences on
+generated ledgers with `proptest`, and
+[`tests/corpus.rs`](tests/corpus.rs) replaces every scalar of the public
+[YAML test suite][yaml-test-suite] with itself. The suite is a git submodule
+at `tests/yaml-test-suite`, pinned to a commit of its `data` branch: run
+`git submodule update --init` after cloning.
+
+[yaml-test-suite]: https://github.com/yaml/yaml-test-suite
+
 ## Features
 
 `serde` (default) adds the edits that write a value (`replace`, `insert`,

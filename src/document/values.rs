@@ -1,12 +1,14 @@
 //! Edits that write a value: through `serde-saphyr` for a serializable value,
 //! or through yamled's scalar rule for a string.
 
+use std::ops::Range;
+
 use serde::Serialize;
 
 use super::{Document, Fragment};
 use crate::index::Style;
 use crate::render::{self, Rendered, TextStyle};
-use crate::text::{LF, NEWLINE, column, line_end, starts_line};
+use crate::text::{LF, NEWLINE, column, line_end, line_start, spaced, starts_line};
 use crate::{Error, Path};
 
 /// Where [`Document::insert`] puts a new key.
@@ -146,23 +148,63 @@ impl Document {
 
     fn splice_value(&mut self, path: &Path, id: usize, rendered: &Rendered) -> Result<(), Error> {
         let node = &self.index.nodes[id];
-        let value = node.value.clone();
+        let value = node.value.start..self.kept_end(id);
         let parent_style = node.parent.map(|parent| self.index.nodes[parent].style);
         match parent_style {
             Some(Style::BlockMapping) => {
                 let (colon, key_column) = self.colon(path, id)?;
+                let value = value.start.max(colon)..value.end.max(colon);
                 let body_column = if rendered.has_indicator() {
                     key_column + 2
                 } else {
                     self.block_body_column(id).unwrap_or(key_column + 2)
                 };
-                let text = rendered.after_key_at(key_column, body_column, self.compact);
-                self.commit_splice(colon, value.end, &text)
+                let key_line_end = line_end(&self.source, colon);
+                let key_line_content =
+                    key_line_end - usize::from(self.source[..key_line_end].ends_with(LF));
+                let on_key_line = value.start <= key_line_content;
+                let block = matches!(self.index.nodes[id].style, Style::Literal | Style::Folded);
+                if on_key_line && !block && rendered.inline_head().is_some() {
+                    let from = colon + self.source[colon..value.start].trim_end().len();
+                    let text = rendered.after_key_at(key_column, body_column, self.compact);
+                    return self.commit_splice(from, value.end, &text);
+                }
+                let (properties, comment) = if on_key_line {
+                    self.key_line_parts(colon, Some(&self.head(id)))
+                } else {
+                    let (properties, comment) = self.key_line_parts(colon, None);
+                    let value_line = line_start(&self.source, value.start);
+                    let own_line = self.source[value_line..value.start].trim();
+                    (spaced(&[&properties, own_line]), comment)
+                };
+                let properties = node_properties(&properties);
+                let to = if on_key_line {
+                    value.end.max(key_line_content)
+                } else {
+                    value.end
+                };
+                let text = rendered.after_key_with(
+                    key_column,
+                    body_column,
+                    self.compact,
+                    &properties,
+                    &comment,
+                );
+                self.commit_splice(colon, to, &text)
             }
             Some(Style::BlockSequence) => {
                 let text = rendered.after_dash(column(&self.source, self.dash(id)));
-                self.commit_splice(value.start, value.end, &text)
+                let lead = if self.source[..value.start].ends_with([' ', '\t']) {
+                    ""
+                } else {
+                    " "
+                };
+                self.commit_splice(value.start, value.end, &format!("{lead}{text}"))
             }
+            Some(_) if value.is_empty() => Err(Error::Unsupported {
+                path: path.clone(),
+                what: "write a value where a flow collection has none",
+            }),
             Some(_) if let Some(head) = rendered.inline_head() => {
                 let head = render::flow_safe(head);
                 self.commit_splice(value.start, value.end, &head)
@@ -171,21 +213,47 @@ impl Document {
                 path: path.clone(),
                 what: "write a block value inside a flow collection",
             }),
-            None => self.commit_splice(
-                value.start,
-                value.end,
-                &rendered.at_root(column(&self.source, value.start)),
-            ),
+            None if value.is_empty() => Err(Error::Unsupported {
+                path: path.clone(),
+                what: "write a value into an empty document",
+            }),
+            None => {
+                let text = rendered.at_root(column(&self.source, value.start));
+                self.commit_splice(value.start, value.end, &text)
+            }
         }
     }
 
-    /// The column a block scalar's text starts at; the parser's span for a
-    /// block scalar begins at its text, not at the `>` or `|` header. `None`
-    /// for any other node.
+    /// The column a block scalar's text starts at: the first line under its
+    /// header that is not blank. `None` for any other node, or a block scalar
+    /// with no text.
     fn block_body_column(&self, id: usize) -> Option<usize> {
         let node = &self.index.nodes[id];
-        matches!(node.style, Style::Folded | Style::Literal)
-            .then(|| column(&self.source, node.value.start))
+        if !matches!(node.style, Style::Folded | Style::Literal) {
+            return None;
+        }
+        let body = line_end(&self.source, node.value.start);
+        self.source
+            .get(body..node.value.end)?
+            .lines()
+            .find(|line| !line.trim().is_empty())
+            .map(|line| line.len() - line.trim_start().len())
+    }
+
+    /// The part of a value written on its first line that belongs to it: a
+    /// block scalar's header, or the whole value for any other node.
+    fn head(&self, id: usize) -> Range<usize> {
+        let node = &self.index.nodes[id];
+        match node.style {
+            Style::Folded | Style::Literal => {
+                let header = self.source[node.value.start..]
+                    .split_whitespace()
+                    .next()
+                    .map_or(0, str::len);
+                node.value.start..node.value.start + header
+            }
+            _ => node.value.clone(),
+        }
     }
 
     fn insert_rendered(
@@ -293,4 +361,14 @@ impl Document {
         };
         format!("[{padding}{}{padding}]", items.join(separator))
     }
+}
+
+/// The anchors and tags in the text before a value, without a block scalar
+/// header such as `|-`, which the new value writes for itself.
+fn node_properties(text: &str) -> String {
+    let properties: Vec<&str> = text
+        .split_whitespace()
+        .filter(|token| token.starts_with(['&', '!']))
+        .collect();
+    properties.join(" ")
 }

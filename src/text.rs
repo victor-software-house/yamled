@@ -13,6 +13,51 @@ pub(crate) fn join(lines: &[String]) -> String {
     lines.join(NEWLINE)
 }
 
+/// The `|` or `>` header of the block scalar whose text starts at `text`.
+/// The parser's span for a block scalar begins at its text, so the header is
+/// found on the nearest line above that is not blank: the last token there
+/// that starts with `|` or `>`, before any comment.
+pub(crate) fn block_header(source: &str, text: usize) -> Option<usize> {
+    let mut line = line_start(source, text);
+    let own = &source[line..text];
+    if own.trim().is_empty() {
+        while line > 0 {
+            line = line_start(source, line - 1);
+            if !source[line..line_end(source, line)].trim().is_empty() {
+                break;
+            }
+        }
+    }
+    let end = if own.trim().is_empty() {
+        line_end(source, line)
+    } else {
+        text
+    };
+    let mut header = None;
+    let mut at = line;
+    for token in source[line..end].split_inclusive(char::is_whitespace) {
+        let word = token.trim_end();
+        if word.starts_with('#') {
+            break;
+        }
+        if word.starts_with(['|', '>']) {
+            header = Some(at);
+        }
+        at += token.len();
+    }
+    header
+}
+
+/// The non-empty parts, joined by one space.
+pub(crate) fn spaced(parts: &[&str]) -> String {
+    parts
+        .iter()
+        .copied()
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 /// A line with its break.
 pub(crate) fn terminated(line: &str) -> String {
     let mut text = line.to_owned();
@@ -42,6 +87,15 @@ pub(crate) fn trim_end(source: &str, start: usize, end: usize) -> usize {
 /// How many characters `at` sits from the start of its line.
 pub(crate) fn column(source: &str, at: usize) -> usize {
     source[line_start(source, at)..at].chars().count()
+}
+
+/// The byte of the last `-` on the line before `at`, or `at` itself: the
+/// dash of the sequence item whose value starts at `at`.
+pub(crate) fn dash_before(source: &str, at: usize) -> usize {
+    let line = line_start(source, at);
+    source[line..at]
+        .rfind('-')
+        .map_or(at, |offset| line + offset)
 }
 
 /// Whether the text from the start of `at`'s line up to `at` is only spaces,

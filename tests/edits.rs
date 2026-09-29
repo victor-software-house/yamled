@@ -935,3 +935,174 @@ fn a_kept_scalar_whose_text_starts_with_blank_lines_does_not_move() {
     ));
     assert_eq!(document.as_str(), source);
 }
+
+#[test]
+fn a_replaced_value_keeps_its_anchor_and_the_key_line_comment() {
+    let mut document = doc(indoc! {"
+        key: &shared old # note
+        copy: *shared
+        list: # rows
+          - a
+    "});
+    document.replace(&root().key("key"), "new").unwrap();
+    document.replace(&root().key("list"), "none").unwrap();
+    let expected = indoc! {"
+        key: &shared new # note
+        copy: *shared
+        list: none # rows
+    "};
+    assert_eq!(document.as_str(), expected);
+    document.replace(&root().key("key"), &["x", "z"]).unwrap();
+    let expected = indoc! {"
+        key: &shared # note
+          - x
+          - z
+        copy: *shared
+        list: none # rows
+    "};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
+fn a_row_goes_into_a_list_written_at_its_keys_column() {
+    let mut document = doc(indoc! {"
+        rows:
+        - id: A-1
+          note: plain
+    "});
+    let row = BTreeMap::from([("id", "A-0"), ("note", "new")]);
+    document.insert_item(&root().key("rows"), 0, &row).unwrap();
+    let expected = indoc! {"
+        rows:
+        - id: A-0
+          note: new
+        - id: A-1
+          note: plain
+    "};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
+fn a_block_scalar_item_or_root_is_replaced_with_its_header() {
+    let mut document = doc(indoc! {"
+        - |
+          old text
+        - kept
+    "});
+    document
+        .replace_text(&root().index(0), "new text", TextStyle::Folded)
+        .unwrap();
+    let expected = indoc! {"
+        - >-
+          new text
+        - kept
+    "};
+    assert_eq!(document.as_str(), expected);
+    let mut document = doc(indoc! {"
+        --- >
+          folded
+    "});
+    document.replace(&root(), "kept folded").unwrap();
+    let expected = indoc! {"
+        --- >-
+              kept folded
+    "};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
+fn an_empty_value_is_written_after_its_colon() {
+    let mut document = doc(indoc! {"
+        a:
+        b: 2
+    "});
+    document.replace(&root().key("a"), "one").unwrap();
+    let expected = indoc! {"
+        a: one
+        b: 2
+    "};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
+fn a_kept_scalar_is_replaced_with_the_blank_lines_it_owns() {
+    let mut document = doc(indoc! {"
+        keep: |+
+          text
+
+        next: 1
+    "});
+    document
+        .replace_text(&root().key("keep"), "new\n\n", TextStyle::Auto)
+        .unwrap();
+    let expected = indoc! {"
+        keep: |+
+          new
+
+        next: 1
+    "};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
+fn an_empty_block_scalar_is_replaced_without_touching_the_next_key() {
+    let mut document = doc(indoc! {"
+        clip: >
+
+        next: 1
+    "});
+    document.replace(&root().key("clip"), "text").unwrap();
+    let expected = indoc! {"
+        clip: >-
+          text
+
+        next: 1
+    "};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
+fn an_empty_tagged_item_gets_its_value_after_a_space() {
+    let mut document = doc(indoc! {"
+        - !!str
+        - b
+    "});
+    document.replace(&root().index(0), "a").unwrap();
+    let expected = indoc! {"
+        - !!str a
+        - b
+    "};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
+fn an_explicit_key_with_a_comment_finds_its_colon_on_the_next_line() {
+    let mut document = doc(indoc! {"
+        ? a # c
+        : b
+    "});
+    document.replace(&root().key("a"), "z").unwrap();
+    let expected = indoc! {"
+        ? a # c
+        : z
+    "};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
+fn a_block_scalar_replaced_by_one_line_keeps_its_header_comment() {
+    let mut document = doc(indoc! {"
+        key: | # note
+          old
+        next: 1
+    "});
+    document
+        .replace_text(&root().key("key"), "new", TextStyle::Auto)
+        .unwrap();
+    let expected = indoc! {"
+        key: |- # note
+          new
+        next: 1
+    "};
+    assert_eq!(document.as_str(), expected);
+}
