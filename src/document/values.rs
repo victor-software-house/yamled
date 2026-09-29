@@ -250,29 +250,19 @@ impl Document {
     /// new value's kind, so `!!int` stays in front of `8081` and refuses the
     /// edit in front of `abc`. The non-specific tag `!` makes a scalar a string
     /// and leaves a collection as it is, so it fits a string, a list, or a map.
+    /// A core tag this version cannot check, such as `!!timestamp`, never fits.
     fn check_tags(&self, path: &Path, properties: &str, rendered: &Rendered) -> Result<(), Error> {
         let handles = self.tag_handles();
-        let fits = properties
+        let misfit = properties
             .split_whitespace()
             .filter(|token| token.starts_with('!'))
-            .all(|tag| {
-                if tag == "!" {
-                    return ["str", "seq", "map"]
-                        .iter()
-                        .any(|name| rendered.fits_core_tag(name));
-                }
-                resolve_tag(tag, &handles)
-                    .as_deref()
-                    .and_then(|full| full.strip_prefix(CORE_TAGS))
-                    .is_none_or(|name| rendered.fits_core_tag(name))
-            });
-        if fits {
-            Ok(())
-        } else {
-            Err(Error::Unsupported {
+            .find(|tag| !tag_fits(tag, &handles, rendered));
+        match misfit {
+            Some(tag) => Err(Error::TagMismatch {
                 path: path.clone(),
-                what: "replace a value whose tag does not fit the new value",
-            })
+                tag: tag.to_owned(),
+            }),
+            None => Ok(()),
         }
     }
 
@@ -476,6 +466,20 @@ fn properties_before(source: &str, start: usize) -> String {
         }
     }
     found.join(" ")
+}
+
+/// Whether a kept tag still describes the new value; see
+/// [`Document::check_tags`].
+fn tag_fits(tag: &str, handles: &[(String, String)], rendered: &Rendered) -> bool {
+    if tag == "!" {
+        return ["str", "seq", "map"]
+            .iter()
+            .any(|name| rendered.fits_core_tag(name));
+    }
+    resolve_tag(tag, handles)
+        .as_deref()
+        .and_then(|full| full.strip_prefix(CORE_TAGS))
+        .is_none_or(|name| rendered.fits_core_tag(name))
 }
 
 /// The prefix YAML's core schema tags share.

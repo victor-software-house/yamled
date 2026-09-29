@@ -1,8 +1,17 @@
 # yaml-language-server: $schema=https://github.com/victor-software-house/qctl/releases/download/v0.4.4/tasks.schema.json
 schema_version: 4
 prefix: YMD
-active: null
-queue: []
+active: YMD-005
+queue:
+  - id: YMD-005
+    title: Name the tag that refuses a replace
+    scope: yamled
+    outcome: A caller whose replace is refused by a tag learns which tag, and the YAML 1.1 type repository tags keep refusing.
+    blocked_by: []
+    acceptance:
+      - A tag refusal returns Error::TagMismatch carrying the tag as written.
+      - A replace under !!timestamp still refuses and names !!timestamp.
+    plan: openspec/changes/name-refused-tag/proposal.md
 archive:
   - id: YMD-004
     title: Keep a kept block scalar's value through every edit

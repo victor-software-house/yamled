@@ -703,7 +703,7 @@ fn an_empty_value_tagged_as_another_kind_is_not_filled() {
         let mut document = doc(source);
         let refused = document.push(&root().key("queue"), "first");
         assert!(
-            matches!(refused, Err(Error::Unsupported { .. })),
+            matches!(refused, Err(Error::TagMismatch { .. })),
             "{source}"
         );
         assert_eq!(document.as_str(), source);
@@ -1141,11 +1141,11 @@ fn a_tag_stays_only_in_front_of_a_value_it_fits() {
     let mut document = doc(source);
     assert!(matches!(
         document.replace(&root().key("port"), "abc"),
-        Err(Error::Unsupported { .. })
+        Err(Error::TagMismatch { .. })
     ));
     assert!(matches!(
         document.replace(&root().key("name"), &["a", "b"]),
-        Err(Error::Unsupported { .. })
+        Err(Error::TagMismatch { .. })
     ));
     assert_eq!(document.as_str(), source);
     document.replace(&root().key("port"), &8081).unwrap();
@@ -1162,6 +1162,27 @@ fn a_tag_stays_only_in_front_of_a_value_it_fits() {
 }
 
 #[test]
+fn a_tag_this_version_cannot_check_is_named_in_the_refusal() {
+    let source = indoc! {"
+        created: !!timestamp 2001-12-14
+    "};
+    let mut document = doc(source);
+    let refused = document.replace(&root().key("created"), "2002-01-01");
+    assert_eq!(
+        refused,
+        Err(Error::TagMismatch {
+            path: root().key("created"),
+            tag: "!!timestamp".to_owned(),
+        })
+    );
+    assert_eq!(
+        refused.unwrap_err().to_string(),
+        "at /created: the tag !!timestamp does not fit the new value"
+    );
+    assert_eq!(document.as_str(), source);
+}
+
+#[test]
 fn a_tag_in_a_flow_collection_or_at_the_root_must_fit_too() {
     let source = indoc! {"
         ports: [!!int 1, !t, 2]
@@ -1171,7 +1192,7 @@ fn a_tag_in_a_flow_collection_or_at_the_root_must_fit_too() {
     for path in [root().key("ports").index(0), root().key("named").key("a")] {
         assert!(matches!(
             document.replace(&path, "abc"),
-            Err(Error::Unsupported { .. })
+            Err(Error::TagMismatch { .. })
         ));
     }
     assert_eq!(document.as_str(), source);
@@ -1192,7 +1213,7 @@ fn a_tag_in_a_flow_collection_or_at_the_root_must_fit_too() {
     let mut document = doc(source);
     assert!(matches!(
         document.replace(&root(), "abc"),
-        Err(Error::Unsupported { .. })
+        Err(Error::TagMismatch { .. })
     ));
     document.replace(&root(), &6).unwrap();
     assert_eq!(
@@ -1227,7 +1248,7 @@ fn a_tag_is_read_through_the_directives_before_the_document() {
     let mut document = doc(source);
     assert!(matches!(
         document.replace(&root().key("port"), "abc"),
-        Err(Error::Unsupported { .. })
+        Err(Error::TagMismatch { .. })
     ));
 
     let source = indoc! {"
@@ -1238,7 +1259,7 @@ fn a_tag_is_read_through_the_directives_before_the_document() {
     let mut document = doc(source);
     assert!(matches!(
         document.replace(&root().key("port"), "abc"),
-        Err(Error::Unsupported { .. })
+        Err(Error::TagMismatch { .. })
     ));
 }
 
@@ -1408,7 +1429,7 @@ fn a_bare_tag_counts_as_a_string_and_a_dash_comment_is_not_a_tag() {
     let mut document = doc(source);
     assert!(matches!(
         document.replace(&root().key("key"), &8081),
-        Err(Error::Unsupported { .. })
+        Err(Error::TagMismatch { .. })
     ));
     assert_eq!(document.as_str(), source);
     document.replace(&root().key("key"), &["a"]).unwrap();

@@ -43,6 +43,15 @@ pub enum Error {
         /// The path of the key that exists.
         path: Path,
     },
+    /// A tag kept in front of the value would retype the new value, such as
+    /// `!!int` in front of `abc`, or a tag whose values this version cannot
+    /// check, such as `!!timestamp`.
+    TagMismatch {
+        /// The path of the node.
+        path: Path,
+        /// The tag as written, such as `!!timestamp`.
+        tag: String,
+    },
     /// The edit is valid YAML but outside what this version can write in
     /// place.
     Unsupported {
@@ -79,6 +88,12 @@ impl fmt::Display for Error {
             }
             Self::KeyExists { path } => write!(formatter, "{path} already exists"),
             Self::Repeated { path } => write!(formatter, "{path} is named twice"),
+            Self::TagMismatch { path, tag } => {
+                write!(
+                    formatter,
+                    "at {path}: the tag {tag} does not fit the new value"
+                )
+            }
             Self::Unsupported { path, what } => write!(formatter, "at {path}: cannot {what} yet"),
             Self::Invalid { message } => write!(formatter, "the edit would not parse: {message}"),
             #[cfg(feature = "serde")]
