@@ -15,5 +15,21 @@ queue:
       - 'Whole-file tests on ledger-shaped fixtures: each edit changes only the lines it names.'
       - The nextest task no longer allows an empty test run.
     plan: openspec/changes/index-and-edits/proposal.md
+
+  - id: YMD-002
+    title: 'Edit what a ledger formatter needs: key moves, flow lists, re-indent, insert at an index'
+    scope: yamled
+    outcome: A work-queue tool reorders sections, edits flow lists, re-indents rows, and inserts new rows at an index through yamled, with no text splicing of its own.
+    blocked_by:
+      - YMD-001
+    acceptance:
+      - A mapping entry moves to another position with its owned comments and value text byte-identical, as take and put do for sequence items.
+      - Removing an item from a flow sequence, or replacing a flow sequence, keeps it a flow sequence with its separators.
+      - A block sequence is re-indented to a given column with its items, comments, block scalars, and blank lines moved by the same offset.
+      - A serialized value is inserted into a sequence at an index in one call, spaced by the sequence's own spacing or the configured Spacing.
+      - Each capability has whole-file tests in tests/workflows.rs.
+    notes:
+      - >-
+        Found by mapping a work-queue tool's 33 accepted mutation snapshots onto yamled edits: 25 map onto the edits in YMD-001; these four do not. Whitespace tidying (trailing spaces, blank runs) stays in the tool.
 archive: []
 horizon: []
