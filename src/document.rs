@@ -364,7 +364,8 @@ impl Document {
     /// nothing) under its key. The key line keeps its node properties and
     /// comment; an empty value on a later line is replaced with its line, and
     /// its own properties and comment move up to the key line. A tag other
-    /// than `!!seq` would contradict the items, so it is refused.
+    /// than `!!seq`, short or verbatim, would contradict the items, so it is
+    /// refused.
     fn fill_empty(&mut self, path: &Path, id: usize, lines: &[String]) -> Result<(), Error> {
         let (colon, key_column) = self.colon(path, id)?;
         let value = self.index.nodes[id].value.clone();
@@ -389,10 +390,9 @@ impl Document {
             comment = spaced(&[&comment, self.source[value.end..end].trim()]);
             end
         };
-        if properties
-            .split_whitespace()
-            .any(|property| property.starts_with('!') && property != "!!seq")
-        {
+        if properties.split_whitespace().any(|property| {
+            property.starts_with('!') && !matches!(property, "!!seq" | "!<tag:yaml.org,2002:seq>")
+        }) {
             return Err(Error::Unsupported {
                 path: path.clone(),
                 what: "fill an empty value whose tag is not !!seq",

@@ -675,10 +675,18 @@ fn a_collection_is_refused_on_the_document_marker_line() {
     let source = indoc! {"
         --- foo
     "};
+    let two = BTreeMap::from([("left", 1), ("right", 2)]);
+    let one = BTreeMap::from([("left", 1)]);
+    let refused = [
+        doc(source).replace(&root(), &two),
+        doc(source).replace(&root(), &one),
+        doc(source).replace(&root(), &["a"]),
+    ];
+    for result in refused {
+        assert!(matches!(result, Err(Error::Invalid { .. })), "{result:?}");
+    }
     let mut document = doc(source);
-    let mapping = BTreeMap::from([("left", 1), ("right", 2)]);
-    let result = document.replace(&root(), &mapping);
-    assert!(matches!(result, Err(Error::Invalid { .. })));
+    let _ = document.replace(&root(), &one);
     assert_eq!(document.as_str(), source);
 }
 
@@ -701,6 +709,19 @@ fn an_empty_value_tagged_as_another_kind_is_not_filled() {
         );
         assert_eq!(document.as_str(), source);
     }
+}
+
+#[test]
+fn an_empty_value_with_the_verbatim_sequence_tag_is_filled() {
+    let mut document = doc(indoc! {"
+        queue: !<tag:yaml.org,2002:seq> []
+    "});
+    document.push(&root().key("queue"), "first").unwrap();
+    let expected = indoc! {"
+        queue: !<tag:yaml.org,2002:seq>
+          - first
+    "};
+    assert_eq!(document.as_str(), expected);
 }
 
 #[test]
