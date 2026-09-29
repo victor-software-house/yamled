@@ -46,7 +46,7 @@ mod path;
 mod render;
 mod text;
 
-pub use crate::document::{Document, Fragment, Node, Position};
+pub use crate::document::{Document, Fragment, Node, Position, Spacing};
 pub use crate::error::Error;
 pub use crate::index::{Location, Style};
 pub use crate::path::{Path, Segment};

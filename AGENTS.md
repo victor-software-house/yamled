@@ -28,7 +28,10 @@ field means, and what a ledger forbids.
    back to the expected value.
 3. **A comment belongs to the node below it** when no blank line separates
    them, and a comment on the same line belongs to that line's node.
-4. **Pure Rust.** `unsafe_code` is forbidden here, and a dependency that
+4. **Spacing is kept, not guessed.** A new sequence item follows the blank
+   lines the sequence already has. Only a sequence that does not settle it
+   (fewer than two items, or both kinds of gap) uses the caller's `Spacing`.
+5. **Pure Rust.** `unsafe_code` is forbidden here, and a dependency that
    carries C or unsafe transpiled code needs a recorded reason.
 
 ## Strings and comments

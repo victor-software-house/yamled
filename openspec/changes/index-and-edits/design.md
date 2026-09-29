@@ -89,6 +89,16 @@ the key: then the text goes two columns under the key. Removing the first key
 of a sequence item moves the comment lines owned by the next key above the
 item, so no neighbour's comment is lost.
 
+### 8. Spacing is kept, not guessed
+
+A new item follows the spacing the sequence shows: blank lines when every pair
+of neighbours is separated, none when no pair is. Only a sequence that shows
+nothing (fewer than two items) or shows both uses the caller's `Spacing`, set
+once per document. Considered: always separating a new item from a non-empty
+list, which wrote a blank line into a compact file that never had one, and
+inferring from the first two items only, which lost the blank line when one of
+two separated rows moved.
+
 ## Risks
 
 1. Flow collections other than an empty `[]` are refused by the edits in this

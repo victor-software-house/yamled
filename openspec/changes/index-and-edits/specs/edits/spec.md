@@ -94,9 +94,8 @@ starts with a space.
 
 `Document::take` SHALL remove a sequence item with its owned comments and
 return it as a fragment. `Document::put` SHALL insert a fragment into a block
-sequence at an index, re-indented to that sequence. When the sequence's items
-are separated by blank lines, the put item SHALL be separated the same way, and
-a take SHALL leave exactly one blank line between the remaining neighbours.
+sequence at an index, re-indented to that sequence. A take SHALL leave exactly
+one blank line between remaining neighbours that were separated.
 
 #### Scenario: A row moves from the queue to the front of the archive
 
@@ -104,3 +103,25 @@ a take SHALL leave exactly one blank line between the remaining neighbours.
 - **THEN** the row's text, including its owned comment, is byte-identical in
   its new place apart from indentation
 - **AND** the queue and the archive keep one blank line between rows
+
+### Requirement: Spacing is kept, not guessed
+
+A new item from `Document::put` or `Document::push` SHALL be separated from its
+neighbours by a blank line when every pair of neighbours in the sequence is
+separated, and SHALL NOT be when no pair is. A sequence with fewer than two
+items, or with both kinds of gap, SHALL use the document's `Spacing`, set with
+`Document::with_spacing`; the default is `Spacing::Tight`.
+
+#### Scenario: A compact list stays compact
+
+- **WHEN** a list has three items with no blank lines between them
+- **AND** the document's spacing is `Spacing::Blank`
+- **AND** the caller moves the last item to index 1
+- **THEN** no blank line is written
+
+#### Scenario: A row moved in a list of two uses the configured spacing
+
+- **WHEN** a list has two items separated by a blank line
+- **AND** the caller takes the second item and puts it at index 0
+- **THEN** a blank line separates the two items under `Spacing::Blank`
+- **AND** none does under `Spacing::Tight`

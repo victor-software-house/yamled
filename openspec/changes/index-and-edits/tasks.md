@@ -54,6 +54,11 @@ After the next incremental review: filling an empty value written on the line
 below its key replaces that line and keeps its comment, and an empty value
 under comment lines is refused. `verify` now also runs taplo, rumdl, typos, and
 actionlint; it passed on the build host with 38 tests and the doc-test.
+Then: a root collection is replaced at column 0; an empty value on a later line
+keeps its anchor; `Spacing` and the rule in `specs/edits/spec.md` replace the
+first-two-items guess; [`tests/workflows.rs`](../../../tests/workflows.rs)
+covers the edit sequences of a work-queue tool (add, start, archive, park,
+promote, reorder, re-indent by a move, and print-back identity).
 
 `deny.toml` now allows `BSD-3-Clause`, for `encoding_rs`, which
 `serde-saphyr`'s `deserialize` feature pulls in through `encoding_rs_io`; the

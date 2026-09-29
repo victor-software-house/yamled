@@ -22,6 +22,21 @@ pub enum Position<'a> {
     After(&'a str),
 }
 
+/// Whether a new sequence item is set off from its neighbours by a blank line,
+/// for a sequence whose own items do not settle it. A sequence whose
+/// neighbours are all separated, or all adjacent, keeps its spacing whatever
+/// this says; one with fewer than two items, or with both kinds of gap, gets
+/// this spacing. Set it with [`Document::with_spacing`].
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Spacing {
+    /// Items follow each other directly.
+    #[default]
+    Tight,
+    /// One blank line between items.
+    Blank,
+}
+
 /// A sequence item taken out of a document by [`Document::take`], with the
 /// comments it owns, ready for [`Document::put`].
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -113,6 +128,7 @@ pub struct Document {
     source: String,
     index: Index,
     compact: bool,
+    spacing: Spacing,
 }
 
 impl Document {
@@ -136,7 +152,15 @@ impl Document {
             source,
             index,
             compact,
+            spacing: Spacing::default(),
         })
+    }
+
+    /// Use `spacing` for new items where a sequence does not settle it.
+    #[must_use]
+    pub fn with_spacing(mut self, spacing: Spacing) -> Self {
+        self.spacing = spacing;
+        self
     }
 
     /// The current text.
@@ -300,8 +324,8 @@ impl Document {
         Ok(Fragment { text: cut.text })
     }
 
-    /// Insert a fragment into a sequence at an index, re-indented to it. Items
-    /// separated by blank lines stay separated.
+    /// Insert a fragment into a sequence at an index, re-indented to it, and
+    /// spaced as [`Spacing`] describes.
     ///
     /// # Errors
     ///
@@ -316,15 +340,10 @@ impl Document {
             Style::BlockSequence => {
                 let dash = column(&self.source, node.value.start);
                 let block = join(&indent(&lines, dash));
-                let separated = match node.children[..] {
-                    [first, second, ..] => has_blank_line(
-                        &self.source,
-                        line_end(&self.source, self.index.nodes[first].value.end),
-                        self.index.owned_start(&self.source, second),
-                    ),
-                    _ => false,
+                let gap = match self.item_spacing(id) {
+                    Spacing::Tight => "",
+                    Spacing::Blank => NEWLINE,
                 };
-                let gap = if separated { NEWLINE } else { "" };
                 if let Some(&child) = node.children.get(index) {
                     let at = self.index.owned_start(&self.source, child);
                     let text = format!("{block}{LF}{gap}");
@@ -360,6 +379,28 @@ impl Document {
                 path: path.clone(),
                 expected: "a block sequence or an empty value",
             }),
+        }
+    }
+
+    /// The spacing a sequence's items already share, or the document's.
+    fn item_spacing(&self, sequence: usize) -> Spacing {
+        let mut gaps = self.index.nodes[sequence].children.windows(2).map(|pair| {
+            let after = line_end(&self.source, self.index.nodes[pair[0]].value.end);
+            has_blank_line(
+                &self.source,
+                after,
+                self.index.owned_start(&self.source, pair[1]),
+            )
+        });
+        match gaps.next() {
+            Some(first) if gaps.all(|gap| gap == first) => {
+                if first {
+                    Spacing::Blank
+                } else {
+                    Spacing::Tight
+                }
+            }
+            _ => self.spacing,
         }
     }
 
