@@ -126,15 +126,7 @@ pub(crate) fn value<T: Serialize + ?Sized>(
     preferred: Option<Style>,
     compact: bool,
 ) -> Result<Rendered, Error> {
-    let options = serde_saphyr::ser_options! {
-        indent_step: 2,
-        compact_list_indent: compact,
-    };
-    let yaml = serde_saphyr::to_string_with_options(&value, options).map_err(|error| {
-        Error::Serialize {
-            message: error.to_string(),
-        }
-    })?;
+    let yaml = serialize(value, compact)?;
     let index = Index::build(&yaml)?;
     let root = index.nodes.first().ok_or_else(|| Error::Serialize {
         message: "the value serialized to nothing".to_owned(),
@@ -155,6 +147,53 @@ pub(crate) fn value<T: Serialize + ?Sized>(
             None => Ok(Rendered::inline(yaml.trim())),
         },
     }
+}
+
+/// The items of a value that serializes to a sequence of scalars that each
+/// fit on one line, written for a flow sequence; `None` for any other value.
+pub(crate) fn flow_items<T: Serialize + ?Sized>(value: &T) -> Result<Option<Vec<String>>, Error> {
+    let yaml = serialize(value, false)?;
+    let index = Index::build(&yaml)?;
+    let Some(root) = index.nodes.first() else {
+        return Ok(None);
+    };
+    match root.style {
+        Style::FlowSequence if root.children.is_empty() => Ok(Some(Vec::new())),
+        Style::BlockSequence => {
+            let mut items = Vec::with_capacity(root.children.len());
+            for &child in &root.children {
+                let node = &index.nodes[child];
+                let written = yaml[node.value.clone()].trim();
+                let item = match node.style {
+                    Style::Plain | Style::SingleQuoted | Style::DoubleQuoted => {
+                        match read_string(written) {
+                            Some(decoded) => text(&decoded, TextStyle::Auto, None)?
+                                .inline_head()
+                                .map(flow_safe),
+                            None => Some(written.to_owned()),
+                        }
+                    }
+                    _ => None,
+                };
+                match item {
+                    Some(item) => items.push(item),
+                    None => return Ok(None),
+                }
+            }
+            Ok(Some(items))
+        }
+        _ => Ok(None),
+    }
+}
+
+fn serialize<T: Serialize + ?Sized>(value: &T, compact: bool) -> Result<String, Error> {
+    let options = serde_saphyr::ser_options! {
+        indent_step: 2,
+        compact_list_indent: compact,
+    };
+    serde_saphyr::to_string_with_options(&value, options).map_err(|error| Error::Serialize {
+        message: error.to_string(),
+    })
 }
 
 /// A scalar as it may appear inside `[...]` or `{...}`, where `,`, `[`, `]`,

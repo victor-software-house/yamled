@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use indoc::indoc;
 use serde::Serialize;
-use yamled::{Document, Error, Path, Position, TextStyle};
+use yamled::{Document, Error, Path, Position, Segment, TextStyle};
 
 const LEDGER: &str = include_str!("fixtures/ledger.yaml");
 
@@ -422,7 +422,6 @@ fn a_ledger_row_moves_with_only_its_own_lines_changing() {
 fn edits_that_do_not_fit_are_refused_and_change_nothing() {
     let source = indoc! {"
         flow: {a: 1}
-        list: [x]
         only:
           key: 1
     "};
@@ -432,7 +431,7 @@ fn edits_that_do_not_fit_are_refused_and_change_nothing() {
         Err(Error::Unsupported { .. })
     ));
     assert!(matches!(
-        document.remove(&root().key("list").index(0)),
+        document.remove(&root().key("flow").key("a")),
         Err(Error::Unsupported { .. })
     ));
     assert!(matches!(
@@ -736,6 +735,155 @@ fn properties_and_comments_from_both_lines_meet_on_the_key_line() {
         queue: !!seq &rows # a # b
           - first
         copy: *rows
+    "};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
+fn a_reorder_that_names_a_child_twice_or_a_missing_one_is_refused() {
+    let source = indoc! {"
+        a: 1
+        b: 2
+    "};
+    let mut document = doc(source);
+    let twice = [Segment::Key("a".to_owned()), Segment::Key("a".to_owned())];
+    assert!(matches!(
+        document.reorder(&root(), &twice),
+        Err(Error::Repeated { .. })
+    ));
+    let missing = [Segment::Key("c".to_owned()), Segment::Key("a".to_owned())];
+    assert!(matches!(
+        document.reorder(&root(), &missing),
+        Err(Error::NoNode { .. })
+    ));
+    assert_eq!(document.as_str(), source);
+}
+
+#[test]
+fn a_reorder_of_keys_on_a_dash_line_is_refused() {
+    let source = indoc! {"
+        - id: A-1
+          title: Row
+    "};
+    let mut document = doc(source);
+    let order = [
+        Segment::Key("title".to_owned()),
+        Segment::Key("id".to_owned()),
+    ];
+    assert!(matches!(
+        document.reorder(&root().index(0), &order),
+        Err(Error::Unsupported { .. })
+    ));
+    assert_eq!(document.as_str(), source);
+}
+
+#[test]
+fn a_reorder_keeps_a_file_that_ends_without_a_line_break() {
+    let mut document = doc(indoc! {"
+        a: 1
+        b: 2
+    "}
+    .trim_end());
+    let order = [Segment::Key("b".to_owned()), Segment::Key("a".to_owned())];
+    document.reorder(&root(), &order).unwrap();
+    let expected = indoc! {"
+        b: 2
+        a: 1
+    "};
+    assert_eq!(document.as_str(), expected.trim_end());
+}
+
+#[test]
+fn flow_items_are_removed_with_one_separator() {
+    let removed = |index: usize| {
+        let mut document = doc(indoc! {"
+            list: [ a, b, c ]
+        "});
+        document.remove(&root().key("list").index(index)).unwrap();
+        document.into_string()
+    };
+    let lines: Vec<String> = (0..3).map(removed).collect();
+    let expected = indoc! {"
+        list: [ b, c ]
+        list: [ a, c ]
+        list: [ a, b ]
+    "};
+    assert_eq!(lines.concat(), expected);
+    let mut document = doc(indoc! {"
+        list: [ a ]
+    "});
+    document.remove(&root().key("list").index(0)).unwrap();
+    let expected = indoc! {"
+        list: []
+    "};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
+fn a_flow_list_on_several_lines_is_not_edited_item_by_item() {
+    let source = indoc! {"
+        list: [
+          a, b
+        ]
+    "};
+    let mut document = doc(source);
+    assert!(matches!(
+        document.remove(&root().key("list").index(0)),
+        Err(Error::Unsupported { .. })
+    ));
+    assert_eq!(document.as_str(), source);
+}
+
+#[test]
+fn a_reindent_that_would_leave_its_key_is_refused() {
+    let source = indoc! {"
+        outer:
+          queue:
+            - a
+          next: 1
+    "};
+    let mut document = doc(source);
+    assert!(matches!(
+        document.reindent(&root().key("outer").key("queue"), 0),
+        Err(Error::Invalid { .. })
+    ));
+    assert_eq!(document.as_str(), source);
+}
+
+#[test]
+fn a_mapping_is_reindented_to_the_right() {
+    let mut document = doc(indoc! {"
+        row:
+          id: A-1
+          notes:
+            - Kept.
+    "});
+    document.reindent(&root().key("row"), 4).unwrap();
+    let expected = indoc! {"
+        row:
+            id: A-1
+            notes:
+              - Kept.
+    "};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
+fn text_is_inserted_at_an_index_in_a_chosen_style() {
+    let mut document = doc(indoc! {"
+        notes:
+          - First.
+          - Third.
+    "});
+    document
+        .insert_item_text(&root().key("notes"), 1, "Second: kept", TextStyle::Folded)
+        .unwrap();
+    let expected = indoc! {"
+        notes:
+          - First.
+          - >-
+            Second: kept
+          - Third.
     "};
     assert_eq!(document.as_str(), expected);
 }

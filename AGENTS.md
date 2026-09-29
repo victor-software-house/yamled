@@ -79,11 +79,12 @@ changed snapshot with `mise run snapshots`.
 ## Features
 
 `serde` (default) adds the edits that write a value (`replace`, `insert`,
-`push`, and their `_text` forms) and pulls `serde` and `serde-saphyr`. Without
-it the crate needs `granit-parser` alone: the location index, `remove`,
-`take`, and `put`. Anything new that needs a serializer goes under `serde`;
-`check:features` lints the crate without it. Dependencies are declared with
-the features the crate uses, default features off.
+`push`, `insert_item`, and their `_text` forms) and pulls `serde` and
+`serde-saphyr`. Without it the crate needs `granit-parser` alone: the location
+index, `remove`, `take`, `put`, `reorder`, and `reindent`. Anything new that
+needs a serializer goes under `serde`; `check:features` lints the crate
+without it. Dependencies are declared with the features the crate uses,
+default features off.
 
 ## Git
 

@@ -33,6 +33,11 @@ pub enum Error {
         /// What the edit needed, such as "a block sequence".
         expected: &'static str,
     },
+    /// A reorder named this child more than once.
+    Repeated {
+        /// The path of the child.
+        path: Path,
+    },
     /// The mapping already has this key.
     KeyExists {
         /// The path of the key that exists.
@@ -73,6 +78,7 @@ impl fmt::Display for Error {
                 write!(formatter, "the node at {path} is not {expected}")
             }
             Self::KeyExists { path } => write!(formatter, "{path} already exists"),
+            Self::Repeated { path } => write!(formatter, "{path} is named twice"),
             Self::Unsupported { path, what } => write!(formatter, "at {path}: cannot {what} yet"),
             Self::Invalid { message } => write!(formatter, "the edit would not parse: {message}"),
             #[cfg(feature = "serde")]
