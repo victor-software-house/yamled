@@ -431,12 +431,12 @@ impl Document {
             comment = spaced(&[&comment, self.source[value.end..end].trim()]);
             end
         };
-        if properties.split_whitespace().any(|property| {
-            property.starts_with('!') && !matches!(property, "!!seq" | "!<tag:yaml.org,2002:seq>")
+        if let Some(tag) = properties.split_whitespace().find(|property| {
+            property.starts_with('!') && !matches!(*property, "!!seq" | "!<tag:yaml.org,2002:seq>")
         }) {
-            return Err(Error::Unsupported {
+            return Err(Error::TagMismatch {
                 path: path.clone(),
-                what: "fill an empty value whose tag is not !!seq",
+                tag: tag.to_owned(),
             });
         }
         let end = if lines.last().is_some_and(|line| line.trim().is_empty()) {

@@ -115,7 +115,7 @@ fn replace_each_scalar(case: &str, source: &str, document: &Document, tally: &mu
                 );
                 tally.replaced += 1;
             }
-            Err(Error::Unsupported { .. }) => tally.unsupported += 1,
+            Err(Error::Unsupported { .. } | Error::TagMismatch { .. }) => tally.unsupported += 1,
             Err(error) => panic!("{case} {pointer}: {error}"),
         }
     }

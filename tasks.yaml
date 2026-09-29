@@ -1,19 +1,28 @@
 # yaml-language-server: $schema=https://github.com/victor-software-house/qctl/releases/download/v0.4.4/tasks.schema.json
 schema_version: 4
 prefix: YMD
-active: YMD-004
+active: YMD-005
 queue:
+  - id: YMD-005
+    title: Name the tag that refuses a replace
+    scope: yamled
+    outcome: A caller whose replace is refused by a tag learns which tag, and the YAML 1.1 type repository tags keep refusing.
+    blocked_by: []
+    acceptance:
+      - A tag refusal returns Error::TagMismatch carrying the tag as written.
+      - A replace under !!timestamp still refuses and names !!timestamp.
+    plan: openspec/changes/name-refused-tag/proposal.md
+archive:
   - id: YMD-004
     title: Keep a kept block scalar's value through every edit
     scope: yamled
     outcome: An item whose last block scalar keeps its trailing lines moves, and its neighbours are edited, with every value unchanged.
-    blocked_by: []
-    acceptance:
-      - take and reorder move such an item instead of refusing it.
-      - remove and insert next to such an item leave its value unchanged.
-      - Each case has a test that reads the values back.
-    plan: openspec/changes/kept-lines/proposal.md
-archive:
+    plan: openspec/changes/archive/2026-09-29-kept-lines/proposal.md
+    completed: 2026-09-29T04:21:22
+    evidence:
+      - 'Released as yamled 0.0.4 (https://crates.io/crates/yamled/0.0.4) from https://github.com/victor-software-house/yamled/pull/10: five new tests fail on 0.0.3 and pass, verify on the build host (105 tests) and in CI, Kody review clean.'
+    disposition: completed
+
   - id: YMD-003
     title: Property and corpus tests for every edit
     scope: yamled
