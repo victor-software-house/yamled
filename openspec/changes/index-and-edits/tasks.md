@@ -47,7 +47,9 @@ the public [ctl-core ledger][ctl-core-ledger].
 each (a flow scalar holding `,` is quoted; removing a dash-line key keeps the
 next key's comment; emptying and refilling a list keeps the key-line comment; a
 replaced block scalar keeps its indentation). `mise run verify` passed again on
-the build host: 33 tests and the doc-test.
+the build host: 33 tests and the doc-test. After Kody's incremental review: a block
+scalar with an indentation indicator goes two columns under its key; emptying
+or filling a list keeps an anchor or tag on the key line. 36 tests pass.
 
 `deny.toml` now allows `BSD-3-Clause`, for `encoding_rs`, which
 `serde-saphyr`'s `deserialize` feature pulls in through `encoding_rs_io`; the

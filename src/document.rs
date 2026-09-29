@@ -1,4 +1,5 @@
 use std::fmt;
+use std::ops::Range;
 
 use serde::Serialize;
 
@@ -358,10 +359,16 @@ impl Document {
                 }
                 let (colon, key_column) = self.colon(path, id)?;
                 let step = if self.compact { 0 } else { 2 };
-                let end = self.index.nodes[id].value.end;
-                let key_line_end = line_end(&self.source, end);
-                let rest = self.source[end..key_line_end].trim_end_matches(LF);
-                let mut placed = vec![rest.to_owned()];
+                let value = self.index.nodes[id].value.clone();
+                let (properties, comment) = self.key_line_parts(colon, Some(value));
+                let key_line_end = line_end(&self.source, colon);
+                let rest = spaced(&[&properties, &comment]);
+                let head = if rest.is_empty() {
+                    rest
+                } else {
+                    format!(" {rest}")
+                };
+                let mut placed = vec![head];
                 placed.extend(indent(&lines, key_column + step));
                 let mut with = join(&placed);
                 with.push(LF);
@@ -426,7 +433,11 @@ impl Document {
         match parent_style {
             Some(Style::BlockMapping) => {
                 let (colon, key_column) = self.colon(path, id)?;
-                let body_column = self.block_body_column(id).unwrap_or(key_column + 2);
+                let body_column = if rendered.has_indicator() {
+                    key_column + 2
+                } else {
+                    self.block_body_column(id).unwrap_or(key_column + 2)
+                };
                 let text = rendered.after_key_at(key_column, body_column, self.compact);
                 self.commit_splice(colon, value.end, &text)
             }
@@ -452,6 +463,25 @@ impl Document {
                 self.commit_splice(value.start, value.end, &join(&lines))
             }
         }
+    }
+
+    /// What follows a key's `:` on its line, apart from `value`: node
+    /// properties such as `&anchor` or `!!tag`, and a trailing comment.
+    fn key_line_parts(&self, colon: usize, value: Option<Range<usize>>) -> (String, String) {
+        let end = line_end(&self.source, colon);
+        let mut rest = self.source[colon..end].trim_end_matches(LF).to_owned();
+        if let Some(value) = value
+            && value.start >= colon
+            && value.end <= colon + rest.len()
+        {
+            rest.replace_range(value.start - colon..value.end - colon, "");
+        }
+        let comment_at = rest
+            .char_indices()
+            .find(|&(at, c)| c == '#' && (at == 0 || rest[..at].ends_with([' ', '\t'])))
+            .map(|(at, _)| at);
+        let (properties, comment) = rest.split_at(comment_at.unwrap_or(rest.len()));
+        (properties.trim().to_owned(), comment.trim().to_owned())
     }
 
     /// The column a block scalar's text starts at; the parser's span for a
@@ -515,12 +545,8 @@ impl Document {
                 path: path.clone(),
                 what: "take the only item of a sequence with no key",
             })?;
-            let key_line = &source[colon..line_end(source, colon)];
-            let with = if key_line.trim().is_empty() {
-                format!(" []{LF}")
-            } else {
-                format!(" []{key_line}")
-            };
+            let (properties, comment) = self.key_line_parts(colon, None);
+            let with = format!(" {}{LF}", spaced(&[&properties, "[]", &comment]));
             return Ok(Cut {
                 from: colon,
                 to: end,
@@ -655,6 +681,16 @@ impl fmt::Display for Document {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&self.source)
     }
+}
+
+/// The non-empty parts, joined by one space.
+fn spaced(parts: &[&str]) -> String {
+    parts
+        .iter()
+        .filter(|part| !part.is_empty())
+        .copied()
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// Whether the file writes list items at their key's column rather than

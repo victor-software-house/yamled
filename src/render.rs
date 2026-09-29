@@ -82,6 +82,14 @@ impl Rendered {
         join(&placed)
     }
 
+    /// Whether the head is a block scalar header with an explicit
+    /// indentation indicator, which YAML measures from the key's indentation.
+    pub(crate) fn has_indicator(&self) -> bool {
+        self.head.as_deref().is_some_and(|head| {
+            head.starts_with(['>', '|']) && head.contains(|c: char| c.is_ascii_digit())
+        })
+    }
+
     fn all_lines(&self) -> Vec<String> {
         self.head
             .iter()

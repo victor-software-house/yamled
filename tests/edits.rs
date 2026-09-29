@@ -574,3 +574,66 @@ fn a_replaced_block_scalar_keeps_its_indentation() {
     "}
     );
 }
+
+#[test]
+fn a_block_scalar_with_an_indicator_is_written_where_the_indicator_says() {
+    let mut document = Document::parse(indoc! {"
+        row:
+            outcome: >-
+                  Old text.
+    "})
+    .unwrap();
+    document
+        .replace_text(
+            &root().key("row").key("outcome"),
+            " leading space",
+            TextStyle::Folded,
+        )
+        .unwrap();
+    assert_eq!(
+        document.as_str(),
+        indoc! {"
+        row:
+            outcome: >2-
+               leading space
+    "}
+    );
+}
+
+#[test]
+fn emptying_a_list_keeps_its_anchor_before_the_brackets() {
+    let mut document = Document::parse(indoc! {"
+        queue: &rows # kept
+          - id: A-1
+        archive: &done []
+    "})
+    .unwrap();
+    let row = document.take(&root().key("queue").index(0)).unwrap();
+    document.put(&root().key("archive"), 0, &row).unwrap();
+    assert_eq!(
+        document.as_str(),
+        indoc! {"
+        queue: &rows [] # kept
+        archive: &done
+          - id: A-1
+    "}
+    );
+}
+
+#[test]
+fn a_row_goes_into_a_key_with_no_value() {
+    let mut document = Document::parse(indoc! {"
+        queue: # empty
+        archive: []
+    "})
+    .unwrap();
+    document.push(&root().key("queue"), "first").unwrap();
+    assert_eq!(
+        document.as_str(),
+        indoc! {"
+        queue: # empty
+          - first
+        archive: []
+    "}
+    );
+}

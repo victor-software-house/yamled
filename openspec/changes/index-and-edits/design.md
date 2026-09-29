@@ -80,9 +80,11 @@ with the parser's message), and `Serialize`. No `anyhow` in a library.
 A plain scalar written inside `[...]` or `{...}` is quoted when it holds `,`,
 `[`, `]`, `{`, or `}`, because those end a plain scalar there even though the
 same text reads back unchanged in block context. Emptying a keyed list writes
-`[]` after the colon and keeps the rest of the key line, such as a comment;
-filling an empty list keeps that rest on the key line and writes the items
-below it. Removing the first key of a sequence item moves the comment lines
+`[]` after the key's node properties (`&anchor`, `!!tag`) and before its
+comment; filling an empty list keeps the properties and the comment on the key
+line and writes the items below it. A replaced block scalar keeps its text
+column, except when it needs an indentation indicator, which YAML measures from
+the key: then the text goes two columns under the key. Removing the first key of a sequence item moves the comment lines
 owned by the next key above the item, so no neighbour's comment is lost.
 
 ## Risks
