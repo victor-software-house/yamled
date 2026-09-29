@@ -311,7 +311,9 @@ fn check(ledger: &Ledger, ops: &[Op]) -> Result<(), TestCaseError> {
         match apply(&mut document, &mut expected, op) {
             Ok(true) => {}
             Ok(false) => continue,
-            Err(Error::Unsupported { .. } | Error::WrongKind { .. }) => {
+            Err(
+                Error::Unsupported { .. } | Error::WrongKind { .. } | Error::TagMismatch { .. },
+            ) => {
                 if document.as_str() != before {
                     return Err(failure(
                         op,
