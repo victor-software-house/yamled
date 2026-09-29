@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use indoc::indoc;
 use serde::Serialize;
-use yamled::{Document, Error, Path, Position, Segment, TextStyle};
+use yamled::{Document, Error, Path, Position, Segment, Spacing, TextStyle};
 
 const LEDGER: &str = include_str!("fixtures/ledger.yaml");
 
@@ -1233,6 +1233,49 @@ fn a_tag_is_read_through_the_directives_before_the_document() {
         document.replace(&root().key("port"), "abc"),
         Err(Error::Unsupported { .. })
     ));
+}
+
+#[test]
+fn an_item_added_after_kept_lines_leaves_them_to_their_item() {
+    let mut document = doc(indoc! {"
+        notes: []
+    "});
+    let notes = root().key("notes");
+    document
+        .push_text(&notes, "two trailing\n\n", TextStyle::Literal)
+        .unwrap();
+    document.push_text(&notes, "last", TextStyle::Auto).unwrap();
+    document
+        .push_text(&notes, "after", TextStyle::Auto)
+        .unwrap();
+    let read: BTreeMap<String, Vec<String>> = serde_saphyr::from_str(document.as_str()).unwrap();
+    assert_eq!(read["notes"], ["two trailing\n\n", "last", "after"]);
+}
+
+#[test]
+fn a_blank_line_between_items_is_not_added_to_kept_lines() {
+    let notes = root().key("notes");
+    let mut document = doc(indoc! {"
+        notes: []
+    "})
+    .with_spacing(Spacing::Blank);
+    document
+        .push_text(&notes, "kept\n\n", TextStyle::Literal)
+        .unwrap();
+    document.push_text(&notes, "last", TextStyle::Auto).unwrap();
+    let read: BTreeMap<String, Vec<String>> = serde_saphyr::from_str(document.as_str()).unwrap();
+    assert_eq!(read["notes"], ["kept\n\n", "last"]);
+
+    let mut document = doc(indoc! {"
+        notes:
+          - last
+    "})
+    .with_spacing(Spacing::Blank);
+    document
+        .insert_item_text(&notes, 0, "kept\n\n", TextStyle::Literal)
+        .unwrap();
+    let read: BTreeMap<String, Vec<String>> = serde_saphyr::from_str(document.as_str()).unwrap();
+    assert_eq!(read["notes"], ["kept\n\n", "last"]);
 }
 
 #[test]
