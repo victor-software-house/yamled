@@ -917,3 +917,21 @@ fn a_node_that_keeps_its_trailing_lines_does_not_move_without_them() {
     "};
     assert_eq!(document.as_str(), expected);
 }
+
+#[test]
+fn a_kept_scalar_whose_text_starts_with_blank_lines_does_not_move() {
+    let source = indoc! {"
+        rows:
+          - note: |+
+
+              kept
+
+          - id: A-2
+    "};
+    let mut document = doc(source);
+    assert!(matches!(
+        document.take(&root().key("rows").index(0)),
+        Err(Error::Unsupported { .. })
+    ));
+    assert_eq!(document.as_str(), source);
+}

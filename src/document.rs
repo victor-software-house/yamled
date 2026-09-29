@@ -574,7 +574,9 @@ impl Document {
 
     /// Whether a node's text ends in a block scalar that keeps its trailing
     /// line breaks (`|+` or `>+`). The blank lines after such a node are part
-    /// of its value, so they cannot stay behind when it moves.
+    /// of its value, so they cannot stay behind when it moves. The header is
+    /// the first line above the text that is not blank, since the text may
+    /// start with blank lines.
     fn ends_in_kept_lines(&self, id: usize) -> bool {
         let mut last = id;
         while let Some(&child) = self.index.nodes[last].children.last() {
@@ -584,11 +586,14 @@ impl Document {
         if !matches!(node.style, Style::Literal | Style::Folded) {
             return false;
         }
-        let text_line = line_start(&self.source, node.value.start);
-        let header_line =
-            &self.source[line_start(&self.source, text_line.saturating_sub(1))..text_line];
-        header_line
-            .split_whitespace()
+        let start = node.value.start;
+        let mut line = line_start(&self.source, start);
+        let mut text = &self.source[line..start];
+        while text.trim().is_empty() && line > 0 {
+            line = line_start(&self.source, line - 1);
+            text = &self.source[line..line_end(&self.source, line)];
+        }
+        text.split_whitespace()
             .find(|token| token.starts_with(['|', '>']))
             .is_some_and(|header| header.contains('+'))
     }
