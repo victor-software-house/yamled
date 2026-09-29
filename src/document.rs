@@ -226,7 +226,8 @@ impl Document {
     ///
     /// [`Error::NoNode`], [`Error::WrongKind`] when the parent is not a block
     /// sequence, [`Error::Unsupported`] for the only item of a sequence with
-    /// no key, and [`Error::Invalid`].
+    /// no key or an item that ends in a block scalar keeping its trailing
+    /// lines (`|+`), and [`Error::Invalid`].
     pub fn take(&mut self, path: &Path) -> Result<Fragment, Error> {
         let id = self.id(path)?;
         let parent = self.parent(path, id)?;
@@ -234,6 +235,12 @@ impl Document {
             return Err(Error::WrongKind {
                 path: path.clone(),
                 expected: "an item of a block sequence",
+            });
+        }
+        if self.ends_in_kept_lines(id) {
+            return Err(Error::Unsupported {
+                path: path.clone(),
+                what: "take an item that ends in a block scalar keeping its trailing lines",
             });
         }
         let cut = self.cut(path, id, parent)?;
@@ -495,7 +502,12 @@ impl Document {
             });
         }
         let (mut from, mut to) = (start, end);
-        if siblings.last() == Some(&id) {
+        let previous_keeps = siblings
+            .iter()
+            .position(|&sibling| sibling == id)
+            .and_then(|at| at.checked_sub(1))
+            .is_some_and(|at| self.ends_in_kept_lines(siblings[at]));
+        if siblings.last() == Some(&id) && !previous_keeps {
             while from > 0 {
                 let previous = line_start(source, from - 1);
                 if !source[previous..from].trim().is_empty() {
@@ -558,6 +570,27 @@ impl Document {
         };
         let rest = &self.source[after..];
         after + rest.len() - rest.trim_start_matches(' ').len()
+    }
+
+    /// Whether a node's text ends in a block scalar that keeps its trailing
+    /// line breaks (`|+` or `>+`). The blank lines after such a node are part
+    /// of its value, so they cannot stay behind when it moves.
+    fn ends_in_kept_lines(&self, id: usize) -> bool {
+        let mut last = id;
+        while let Some(&child) = self.index.nodes[last].children.last() {
+            last = child;
+        }
+        let node = &self.index.nodes[last];
+        if !matches!(node.style, Style::Literal | Style::Folded) {
+            return false;
+        }
+        let text_line = line_start(&self.source, node.value.start);
+        let header_line =
+            &self.source[line_start(&self.source, text_line.saturating_sub(1))..text_line];
+        header_line
+            .split_whitespace()
+            .find(|token| token.starts_with(['|', '>']))
+            .is_some_and(|header| header.contains('+'))
     }
 
     /// The byte of the `-` that starts a sequence item.

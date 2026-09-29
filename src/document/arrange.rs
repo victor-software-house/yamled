@@ -19,7 +19,8 @@ impl Document {
     /// [`Error::NoNode`] for a missing collection or child,
     /// [`Error::WrongKind`] when the path is not a block collection,
     /// [`Error::Repeated`] for a child named twice, [`Error::Unsupported`]
-    /// for a child that shares its line with its parent's dash, and
+    /// for a child that shares its line with its parent's dash or ends in a
+    /// block scalar that keeps its trailing lines (`|+`), and
     /// [`Error::Invalid`].
     pub fn reorder(&mut self, path: &Path, order: &[Segment]) -> Result<(), Error> {
         let id = self.block_collection(path)?;
@@ -41,6 +42,15 @@ impl Document {
                 return Err(Error::Repeated { path: child_path });
             }
             named.push(slot);
+        }
+        if named
+            .iter()
+            .any(|&slot| self.ends_in_kept_lines(children[slot]))
+        {
+            return Err(Error::Unsupported {
+                path: path.clone(),
+                what: "reorder a child that ends in a block scalar keeping its trailing lines",
+            });
         }
         if let Some(&child) = children.iter().find(|&&child| !self.starts_own_line(child)) {
             return Err(Error::Unsupported {

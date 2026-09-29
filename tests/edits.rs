@@ -887,3 +887,33 @@ fn text_is_inserted_at_an_index_in_a_chosen_style() {
     "};
     assert_eq!(document.as_str(), expected);
 }
+
+#[test]
+fn a_node_that_keeps_its_trailing_lines_does_not_move_without_them() {
+    let source = indoc! {"
+        rows:
+          - note: |+
+              kept
+
+          - id: A-2
+    "};
+    let rows = root().key("rows");
+    let mut document = doc(source);
+    assert!(matches!(
+        document.take(&rows.clone().index(0)),
+        Err(Error::Unsupported { .. })
+    ));
+    assert!(matches!(
+        document.reorder(&rows, &[Segment::Index(1), Segment::Index(0)]),
+        Err(Error::Unsupported { .. })
+    ));
+    assert_eq!(document.as_str(), source);
+    document.remove(&rows.index(1)).unwrap();
+    let expected = indoc! {"
+        rows:
+          - note: |+
+              kept
+
+    "};
+    assert_eq!(document.as_str(), expected);
+}
