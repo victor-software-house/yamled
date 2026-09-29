@@ -1197,7 +1197,7 @@ fn a_tag_in_a_flow_collection_or_at_the_root_must_fit_too() {
 }
 
 #[test]
-fn a_redefined_secondary_handle_is_not_a_core_tag() {
+fn a_tag_is_read_through_the_directives_before_the_document() {
     let source = indoc! {"
         %TAG !! tag:example.com,2000:app/
         ---
@@ -1211,6 +1211,28 @@ fn a_redefined_secondary_handle_is_not_a_core_tag() {
         port: !!int 4 - 6
     "};
     assert_eq!(document.as_str(), expected);
+
+    let source = indoc! {"
+        %TAG !e! tag:yaml.org,2002:
+        ---
+        port: !e!int 1
+    "};
+    let mut document = doc(source);
+    assert!(matches!(
+        document.replace(&root().key("port"), "abc"),
+        Err(Error::Unsupported { .. })
+    ));
+
+    let source = indoc! {"
+        port: !!int 1
+        text: |
+          %TAG !! tag:example.com,2000:app/
+    "};
+    let mut document = doc(source);
+    assert!(matches!(
+        document.replace(&root().key("port"), "abc"),
+        Err(Error::Unsupported { .. })
+    ));
 }
 
 #[test]

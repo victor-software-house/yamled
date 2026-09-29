@@ -246,17 +246,12 @@ impl Document {
     }
 
     /// Refuse a replace whose kept tags would retype the new value. An anchor
-    /// and a local tag (`!name`) always stay; a core tag stays only when it
-    /// names the new value's kind, so `!!int` stays in front of `8081` and
-    /// refuses the edit in front of `abc`. The non-specific tag `!` makes a
-    /// scalar a string and leaves a collection as it is, so it fits a string,
-    /// a list, or a map. A `%TAG !!` directive makes `!!` a local handle.
+    /// and a local tag always stay; a core tag stays only when it names the
+    /// new value's kind, so `!!int` stays in front of `8081` and refuses the
+    /// edit in front of `abc`. The non-specific tag `!` makes a scalar a string
+    /// and leaves a collection as it is, so it fits a string, a list, or a map.
     fn check_tags(&self, path: &Path, properties: &str, rendered: &Rendered) -> Result<(), Error> {
-        let secondary = if self.redefines_secondary_handle() {
-            None
-        } else {
-            Some("!!")
-        };
+        let handles = self.tag_handles();
         let fits = properties
             .split_whitespace()
             .filter(|token| token.starts_with('!'))
@@ -266,12 +261,9 @@ impl Document {
                         .iter()
                         .any(|name| rendered.fits_core_tag(name));
                 }
-                secondary
-                    .and_then(|handle| tag.strip_prefix(handle))
-                    .or_else(|| {
-                        tag.strip_prefix("!<tag:yaml.org,2002:")
-                            .and_then(|name| name.strip_suffix('>'))
-                    })
+                resolve_tag(tag, &handles)
+                    .as_deref()
+                    .and_then(|full| full.strip_prefix(CORE_TAGS))
                     .is_none_or(|name| rendered.fits_core_tag(name))
             });
         if fits {
@@ -284,13 +276,35 @@ impl Document {
         }
     }
 
-    /// Whether a directive before the document's `---` binds `!!` to another
-    /// prefix, so `!!int` no longer names the core type.
-    fn redefines_secondary_handle(&self) -> bool {
-        self.source
-            .lines()
-            .take_while(|line| !line.starts_with("---"))
-            .any(|line| line.split_whitespace().take(2).eq(["%TAG", "!!"]))
+    /// The tag handles in force: YAML's defaults, then each `%TAG` directive
+    /// written before the document's `---`. Directives start at column 0 and
+    /// only comments and blank lines sit between them, so any other line ends
+    /// the search and leaves the defaults.
+    fn tag_handles(&self) -> Vec<(String, String)> {
+        let mut handles = vec![
+            ("!".to_owned(), "!".to_owned()),
+            ("!!".to_owned(), CORE_TAGS.to_owned()),
+        ];
+        let mut declared = Vec::new();
+        for line in self.source.lines() {
+            if line.starts_with("---") {
+                handles.extend(declared);
+                return handles;
+            }
+            let directive = line.starts_with('%');
+            let mut words = line.split_whitespace();
+            match words.next() {
+                Some("%TAG") if directive => {
+                    if let (Some(handle), Some(prefix)) = (words.next(), words.next()) {
+                        declared.push((handle.to_owned(), prefix.to_owned()));
+                    }
+                }
+                None => {}
+                Some(word) if directive || word.starts_with('#') => {}
+                Some(_) => break,
+            }
+        }
+        handles
     }
 
     /// The column a block scalar's text starts at: the first line under its
@@ -462,6 +476,24 @@ fn properties_before(source: &str, start: usize) -> String {
         }
     }
     found.join(" ")
+}
+
+/// The prefix YAML's core schema tags share.
+const CORE_TAGS: &str = "tag:yaml.org,2002:";
+
+/// A tag's full name: a verbatim tag as written, or its handle's prefix
+/// joined to its suffix, the handle declared last winning. `None` for a
+/// handle nothing declares.
+fn resolve_tag(tag: &str, handles: &[(String, String)]) -> Option<String> {
+    if let Some(verbatim) = tag.strip_prefix("!<") {
+        return verbatim.strip_suffix('>').map(str::to_owned);
+    }
+    let handle = match tag[1..].find('!') {
+        Some(at) => &tag[..at + 2],
+        None => "!",
+    };
+    let (_, prefix) = handles.iter().rev().find(|(name, _)| name == handle)?;
+    Some(format!("{prefix}{}", &tag[handle.len()..]))
 }
 
 const FLOW_INDICATORS: [char; 4] = ['[', '{', ',', ':'];
