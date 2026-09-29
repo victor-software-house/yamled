@@ -5,9 +5,12 @@
 /// refused at parse time, so this is the only one.
 pub(crate) const LF: char = '\n';
 
+/// [`LF`] as a string, for joining and inserting.
+pub(crate) const NEWLINE: &str = "\n";
+
 /// Lines joined into text, with no break after the last one.
 pub(crate) fn join(lines: &[String]) -> String {
-    lines.join(LF.encode_utf8(&mut [0; 4]))
+    lines.join(NEWLINE)
 }
 
 /// A line with its break.

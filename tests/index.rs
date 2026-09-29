@@ -34,12 +34,12 @@ fn a_nested_value_is_found_by_its_path() {
 fn a_block_collection_ends_at_its_last_value() {
     let document = Document::parse(ROWS).unwrap();
     let first = document.node(&Path::root().key("queue").index(0)).unwrap();
-    assert_eq!(
-        first.text(),
-        indoc! {r#"
+    let expected = indoc! {r#"
         id: A-1
-            title: "First: row""#}
-    );
+            title: "First: row"
+    "#}
+    .trim_end();
+    assert_eq!(first.text(), expected);
 }
 
 #[test]
@@ -155,10 +155,8 @@ fn a_hash_inside_a_block_scalar_is_not_a_comment() {
     "};
     let document = Document::parse(source).unwrap();
     let next = document.node(&Path::root().key("next")).unwrap().owned();
-    assert_eq!(
-        &source[next.start..next.end],
-        indoc! {"
+    let expected = indoc! {"
         next: 1
-    "}
-    );
+    "};
+    assert_eq!(&source[next.start..next.end], expected);
 }

@@ -7,6 +7,11 @@ use yamled::{Document, Error, Path, Position, TextStyle};
 
 const LEDGER: &str = include_str!("fixtures/ledger.yaml");
 
+#[track_caller]
+fn doc(source: &str) -> Document {
+    Document::parse(source).unwrap_or_else(|error| panic!("fixture does not parse: {error}"))
+}
+
 fn root() -> Path {
     Path::root()
 }
@@ -40,161 +45,139 @@ fn replacing_one_value_leaves_the_rest_of_a_ledger_byte_identical() {
 
 #[test]
 fn a_plain_title_that_now_needs_quoting_is_quoted_once() {
-    let mut document = Document::parse(indoc! {"
+    let mut document = doc(indoc! {"
         - id: A-1
           title: Old
-    "})
-    .unwrap();
+    "});
     document
         .replace(&root().index(0).key("title"), "A new title: with a colon")
         .unwrap();
-    assert_eq!(
-        document.as_str(),
-        indoc! {"
+    let expected = indoc! {"
         - id: A-1
           title: 'A new title: with a colon'
-    "}
-    );
+    "};
+    assert_eq!(document.as_str(), expected);
 }
 
 #[test]
 fn a_quoted_scalar_stays_quoted_and_a_folded_one_stays_folded() {
-    let mut document = Document::parse(indoc! {r#"
+    let mut document = doc(indoc! {r#"
         title: "Old"
         outcome: >-
           The old outcome.
         next: kept
-    "#})
-    .unwrap();
+    "#});
     document.replace(&root().key("title"), "New").unwrap();
     document
         .replace(&root().key("outcome"), "The new outcome.")
         .unwrap();
-    assert_eq!(
-        document.as_str(),
-        indoc! {r#"
+    let expected = indoc! {r#"
         title: "New"
         outcome: >-
           The new outcome.
         next: kept
-    "#}
-    );
+    "#};
+    assert_eq!(document.as_str(), expected);
 }
 
 #[test]
 fn a_string_that_reads_as_another_type_is_quoted() {
-    let mut document = Document::parse(indoc! {"
+    let mut document = doc(indoc! {"
         flag: x
         count: x
         text: x
-    "})
-    .unwrap();
+    "});
     document.replace(&root().key("flag"), &true).unwrap();
     document.replace(&root().key("count"), &4).unwrap();
     document.replace(&root().key("text"), "true").unwrap();
-    assert_eq!(
-        document.as_str(),
-        indoc! {"
+    let expected = indoc! {"
         flag: true
         count: 4
         text: 'true'
-    "}
-    );
+    "};
+    assert_eq!(document.as_str(), expected);
 }
 
 #[test]
 fn replacing_a_list_writes_it_at_the_files_indentation() {
-    let mut document = Document::parse(indoc! {"
+    let mut document = doc(indoc! {"
         row:
           blocked_by: []
           acceptance:
             - Old.
-    "})
-    .unwrap();
+    "});
     document
         .replace(&root().key("row").key("acceptance"), &["First.", "Second."])
         .unwrap();
-    assert_eq!(
-        document.as_str(),
-        indoc! {"
+    let expected = indoc! {"
         row:
           blocked_by: []
           acceptance:
             - First.
             - Second.
-    "}
-    );
+    "};
+    assert_eq!(document.as_str(), expected);
 }
 
 #[test]
 fn removing_an_item_keeps_the_next_rows_comment() {
-    let mut document = Document::parse(indoc! {"
+    let mut document = doc(indoc! {"
         queue:
           - id: A-1
 
           # owns A-2
           - id: A-2
-    "})
-    .unwrap();
+    "});
     document.remove(&root().key("queue").index(0)).unwrap();
-    assert_eq!(
-        document.as_str(),
-        indoc! {"
+    let expected = indoc! {"
         queue:
           # owns A-2
           - id: A-2
-    "}
-    );
+    "};
+    assert_eq!(document.as_str(), expected);
 }
 
 #[test]
 fn removing_a_key_takes_its_own_comment_and_nothing_else() {
-    let mut document = Document::parse(indoc! {"
+    let mut document = doc(indoc! {"
         row:
           id: A-1
           # why the outcome
           outcome: gone
           # why the scope
           scope: kept
-    "})
-    .unwrap();
+    "});
     document.remove(&root().key("row").key("outcome")).unwrap();
-    assert_eq!(
-        document.as_str(),
-        indoc! {"
+    let expected = indoc! {"
         row:
           id: A-1
           # why the scope
           scope: kept
-    "}
-    );
+    "};
+    assert_eq!(document.as_str(), expected);
 }
 
 #[test]
 fn removing_the_first_key_of_a_row_keeps_the_dash() {
-    let mut document = Document::parse(indoc! {"
+    let mut document = doc(indoc! {"
         - id: A-1
           title: Kept
-    "})
-    .unwrap();
+    "});
     document.remove(&root().index(0).key("id")).unwrap();
-    assert_eq!(
-        document.as_str(),
-        indoc! {"
+    let expected = indoc! {"
         - title: Kept
-    "}
-    );
+    "};
+    assert_eq!(document.as_str(), expected);
 }
 
 #[test]
 fn a_note_is_appended_to_a_block_list() {
-    let mut document = Document::parse(indoc! {"
-    row:
-      notes:
-        - first
-        - second
-    "})
-    .unwrap();
+    let mut document = doc(indoc! {"
+        row:
+          notes:
+            - first
+            - second
+    "});
     let notes = root().key("row").key("notes");
     document.push(&notes, "third").unwrap();
     document
@@ -203,67 +186,61 @@ fn a_note_is_appended_to_a_block_list() {
     document
         .push(&notes, "2026-09-28: quoted when automatic")
         .unwrap();
-    assert_eq!(
-        document.as_str(),
-        indoc! {"
-    row:
-      notes:
-        - first
-        - second
-        - third
-        - >-
-          2026-09-28: a dated note
-        - '2026-09-28: quoted when automatic'
-    "}
-    );
+    let expected = indoc! {"
+        row:
+          notes:
+            - first
+            - second
+            - third
+            - >-
+              2026-09-28: a dated note
+            - '2026-09-28: quoted when automatic'
+    "};
+    assert_eq!(document.as_str(), expected);
 }
 
 #[test]
 fn folded_text_that_starts_with_a_space_gets_an_indentation_indicator() {
-    let mut document = Document::parse(indoc! {"
+    let mut document = doc(indoc! {"
         notes:
           - first
-    "})
-    .unwrap();
+    "});
     document
         .push_text(&root().key("notes"), " leading space", TextStyle::Folded)
         .unwrap();
-    assert_eq!(
-        document.as_str(),
-        indoc! {"
+    let expected = indoc! {"
         notes:
           - first
           - >2-
              leading space
-    "}
-    );
+    "};
+    assert_eq!(document.as_str(), expected);
 }
 
 #[test]
 fn literal_text_keeps_its_line_breaks() {
-    let mut document = Document::parse(indoc! {"
+    let mut document = doc(indoc! {"
         notes:
           - first
-    "})
-    .unwrap();
+    "});
     let text = indoc! {"
         line one
 
-        line three"};
+        line three
+    "}
+    .trim_end();
     document
         .push_text(&root().key("notes"), text, TextStyle::Literal)
         .unwrap();
-    assert_eq!(
-        document.as_str(),
-        indoc! {"
+    let expected = indoc! {"
         notes:
           - first
           - |-
             line one
 
             line three
-    "}
-    );
+    "};
+    assert_eq!(document.as_str(), expected);
 }
 
 #[derive(Serialize)]
@@ -275,23 +252,20 @@ struct Row<'a> {
 
 #[test]
 fn the_first_row_goes_into_an_empty_queue() {
-    let mut document = Document::parse(indoc! {"
+    let mut document = doc(indoc! {"
         # yaml-language-server: $schema=x
         active: null
         queue: []
 
         archive: []
-    "})
-    .unwrap();
+    "});
     let row = Row {
         id: "T-001",
         title: "First: row",
         acceptance: vec!["It holds."],
     };
     document.push(&root().key("queue"), &row).unwrap();
-    assert_eq!(
-        document.as_str(),
-        indoc! {r#"
+    let expected = indoc! {r#"
         # yaml-language-server: $schema=x
         active: null
         queue:
@@ -301,17 +275,16 @@ fn the_first_row_goes_into_an_empty_queue() {
               - It holds.
 
         archive: []
-    "#}
-    );
+    "#};
+    assert_eq!(document.as_str(), expected);
 }
 
 #[test]
 fn a_key_is_inserted_at_the_end_before_or_after_a_key() {
-    let mut document = Document::parse(indoc! {"
+    let mut document = doc(indoc! {"
         - id: A-1
           title: Row
-    "})
-    .unwrap();
+    "});
     let row = root().index(0);
     document
         .insert(&row, "scope", "yamled", Position::End)
@@ -322,16 +295,14 @@ fn a_key_is_inserted_at_the_end_before_or_after_a_key() {
     document
         .insert(&row, "rank", &1, Position::Before("id"))
         .unwrap();
-    assert_eq!(
-        document.as_str(),
-        indoc! {"
+    let expected = indoc! {"
         - rank: 1
           id: A-1
           kind: task
           title: Row
           scope: yamled
-    "}
-    );
+    "};
+    assert_eq!(document.as_str(), expected);
     assert!(matches!(
         document.insert(&row, "id", "again", Position::End),
         Err(Error::KeyExists { .. })
@@ -340,7 +311,7 @@ fn a_key_is_inserted_at_the_end_before_or_after_a_key() {
 
 #[test]
 fn a_row_moves_from_the_queue_to_the_front_of_the_archive() {
-    let mut document = Document::parse(indoc! {"
+    let mut document = doc(indoc! {"
         queue:
           # owns A-1
           - id: A-1
@@ -352,13 +323,10 @@ fn a_row_moves_from_the_queue_to_the_front_of_the_archive() {
         archive:
           - id: A-0
             title: Done
-    "})
-    .unwrap();
+    "});
     let row = document.take(&root().key("queue").index(0)).unwrap();
     document.put(&root().key("archive"), 0, &row).unwrap();
-    assert_eq!(
-        document.as_str(),
-        indoc! {"
+    let expected = indoc! {"
         queue:
           - id: A-2
             title: Staying
@@ -369,80 +337,68 @@ fn a_row_moves_from_the_queue_to_the_front_of_the_archive() {
             title: Moving
           - id: A-0
             title: Done
-    "}
-    );
+    "};
+    assert_eq!(document.as_str(), expected);
 }
 
 #[test]
 fn a_moved_row_keeps_blank_line_separators() {
-    let mut document = Document::parse(indoc! {"
+    let mut document = doc(indoc! {"
         queue:
           - id: A-1
 
           - id: A-2
 
           - id: A-3
-    "})
-    .unwrap();
+    "});
     let row = document.take(&root().key("queue").index(2)).unwrap();
     document.put(&root().key("queue"), 0, &row).unwrap();
-    assert_eq!(
-        document.as_str(),
-        indoc! {"
+    let expected = indoc! {"
         queue:
           - id: A-3
 
           - id: A-1
 
           - id: A-2
-    "}
-    );
+    "};
+    assert_eq!(document.as_str(), expected);
     let row = document.take(&root().key("queue").index(0)).unwrap();
     document.put(&root().key("queue"), 2, &row).unwrap();
-    assert_eq!(
-        document.as_str(),
-        indoc! {"
+    let expected = indoc! {"
         queue:
           - id: A-1
 
           - id: A-2
 
           - id: A-3
-    "}
-    );
+    "};
+    assert_eq!(document.as_str(), expected);
 }
 
 #[test]
 fn taking_the_only_item_leaves_an_empty_list() {
-    let mut document = Document::parse(indoc! {"
+    let mut document = doc(indoc! {"
         queue:
           - id: A-1
         archive: []
-    "})
-    .unwrap();
+    "});
     let row = document.take(&root().key("queue").index(0)).unwrap();
-    assert_eq!(
-        row.as_str(),
-        indoc! {"
+    let expected = indoc! {"
         - id: A-1
-    "}
-    );
-    assert_eq!(
-        document.as_str(),
-        indoc! {"
+    "};
+    assert_eq!(row.as_str(), expected);
+    let expected = indoc! {"
         queue: []
         archive: []
-    "}
-    );
+    "};
+    assert_eq!(document.as_str(), expected);
     document.put(&root().key("archive"), 0, &row).unwrap();
-    assert_eq!(
-        document.as_str(),
-        indoc! {"
+    let expected = indoc! {"
         queue: []
         archive:
           - id: A-1
-    "}
-    );
+    "};
+    assert_eq!(document.as_str(), expected);
 }
 
 #[test]
@@ -494,95 +450,82 @@ fn edits_that_do_not_fit_are_refused_and_change_nothing() {
 
 #[test]
 fn a_flow_scalar_with_a_flow_indicator_is_quoted() {
-    let mut document = Document::parse(indoc! {"
+    let mut document = doc(indoc! {"
         list: [x]
         flow: {a: 1}
-    "})
-    .unwrap();
+    "});
     document
         .replace(&root().key("list").index(0), "a, b")
         .unwrap();
     document
         .replace(&root().key("flow").key("a"), "x, y")
         .unwrap();
-    assert_eq!(
-        document.as_str(),
-        indoc! {"
+    let expected = indoc! {"
         list: ['a, b']
         flow: {a: 'x, y'}
-    "}
-    );
+    "};
+    assert_eq!(document.as_str(), expected);
 }
 
 #[test]
 fn removing_a_dash_line_key_keeps_the_next_keys_comment() {
-    let mut document = Document::parse(indoc! {"
+    let mut document = doc(indoc! {"
         - id: A-1
           # why the title
           title: Kept
-    "})
-    .unwrap();
+    "});
     document.remove(&root().index(0).key("id")).unwrap();
-    assert_eq!(
-        document.as_str(),
-        indoc! {"
+    let expected = indoc! {"
         # why the title
         - title: Kept
-    "}
-    );
+    "};
+    assert_eq!(document.as_str(), expected);
 }
 
 #[test]
 fn emptying_and_refilling_a_list_keeps_the_key_line_comment() {
-    let mut document = Document::parse(indoc! {"
+    let mut document = doc(indoc! {"
         queue: # rows
           - id: A-1
         archive: [] # done
-    "})
-    .unwrap();
+    "});
     let row = document.take(&root().key("queue").index(0)).unwrap();
     document.put(&root().key("archive"), 0, &row).unwrap();
-    assert_eq!(
-        document.as_str(),
-        indoc! {"
+    let expected = indoc! {"
         queue: [] # rows
         archive: # done
           - id: A-1
-    "}
-    );
+    "};
+    assert_eq!(document.as_str(), expected);
 }
 
 #[test]
 fn a_replaced_block_scalar_keeps_its_indentation() {
-    let mut document = Document::parse(indoc! {"
+    let mut document = doc(indoc! {"
         row:
             outcome: >-
                   Old text.
             next: kept
-    "})
-    .unwrap();
+    "});
     document
         .replace(&root().key("row").key("outcome"), "New text.")
         .unwrap();
-    assert_eq!(
-        document.as_str(),
-        indoc! {"
+    let expected = indoc! {"
         row:
             outcome: >-
                   New text.
             next: kept
-    "}
-    );
+    "};
+    assert_eq!(document.as_str(), expected);
 }
 
 #[test]
 fn a_block_scalar_with_an_indicator_is_written_where_the_indicator_says() {
-    let mut document = Document::parse(indoc! {"
+    let mut document = doc(indoc! {"
         row:
             outcome: >-
                   Old text.
-    "})
-    .unwrap();
+    "});
     document
         .replace_text(
             &root().key("row").key("outcome"),
@@ -590,50 +533,78 @@ fn a_block_scalar_with_an_indicator_is_written_where_the_indicator_says() {
             TextStyle::Folded,
         )
         .unwrap();
-    assert_eq!(
-        document.as_str(),
-        indoc! {"
+    let expected = indoc! {"
         row:
             outcome: >2-
                leading space
-    "}
-    );
+    "};
+    assert_eq!(document.as_str(), expected);
 }
 
 #[test]
 fn emptying_a_list_keeps_its_anchor_before_the_brackets() {
-    let mut document = Document::parse(indoc! {"
+    let mut document = doc(indoc! {"
         queue: &rows # kept
           - id: A-1
         archive: &done []
-    "})
-    .unwrap();
+    "});
     let row = document.take(&root().key("queue").index(0)).unwrap();
     document.put(&root().key("archive"), 0, &row).unwrap();
-    assert_eq!(
-        document.as_str(),
-        indoc! {"
+    let expected = indoc! {"
         queue: &rows [] # kept
         archive: &done
           - id: A-1
-    "}
-    );
+    "};
+    assert_eq!(document.as_str(), expected);
 }
 
 #[test]
 fn a_row_goes_into_a_key_with_no_value() {
-    let mut document = Document::parse(indoc! {"
+    let mut document = doc(indoc! {"
         queue: # empty
         archive: []
-    "})
-    .unwrap();
+    "});
     document.push(&root().key("queue"), "first").unwrap();
-    assert_eq!(
-        document.as_str(),
-        indoc! {"
+    let expected = indoc! {"
         queue: # empty
           - first
         archive: []
-    "}
-    );
+    "};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
+fn an_empty_value_on_a_later_line_is_replaced() {
+    let mut document = doc(indoc! {"
+        queue:
+          [] # none yet
+        horizon: [
+        ]
+        archive: []
+    "});
+    document.push(&root().key("queue"), "first").unwrap();
+    document.push(&root().key("horizon"), "later").unwrap();
+    let expected = indoc! {"
+        queue: # none yet
+          - first
+        horizon:
+          - later
+        archive: []
+    "};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
+fn an_empty_value_under_comment_lines_is_refused() {
+    let source = indoc! {"
+        queue:
+          # why it is empty
+          ~
+    "};
+    let mut document = Document::parse(source).unwrap();
+    assert!(matches!(
+        document.push(&root().key("queue"), "first"),
+        Err(Error::Unsupported { .. })
+    ));
+    assert_eq!(document.as_str(), source);
 }

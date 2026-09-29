@@ -2,6 +2,7 @@
 
 use std::collections::BTreeMap;
 use std::fmt::{self, Write as _};
+use std::iter;
 
 use serde::de::{self, Deserializer, Visitor};
 use serde::{Deserialize, Serialize};
@@ -25,23 +26,25 @@ pub enum TextStyle {
     Literal,
 }
 
-/// What a value looks like before it is placed: the part that sits on the
-/// key's or dash's line, and the lines below it, relative to column 0.
+/// What a value looks like before it is placed, relative to column 0.
 #[derive(Clone, Debug)]
-pub(crate) struct Rendered {
-    pub(crate) head: Option<String>,
-    pub(crate) body: Vec<String>,
-    pub(crate) kind: Kind,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Kind {
-    Scalar,
-    Sequence,
-    Mapping,
+pub(crate) enum Rendered {
+    /// The text on the key's or dash's line, and a block scalar's lines below.
+    Scalar { head: String, body: Vec<String> },
+    /// A block sequence, one entry per line of text.
+    Sequence(Vec<String>),
+    /// A block mapping, one entry per line of text.
+    Mapping(Vec<String>),
 }
 
 impl Rendered {
+    fn inline(head: impl Into<String>) -> Self {
+        Self::Scalar {
+            head: head.into(),
+            body: Vec::new(),
+        }
+    }
+
     /// The text after `key:`, for a key at `key_column`. `compact` puts list
     /// items at the key's column instead of under it.
     pub(crate) fn after_key(&self, key_column: usize, compact: bool) -> String {
@@ -56,46 +59,45 @@ impl Rendered {
         body_column: usize,
         compact: bool,
     ) -> String {
-        if let (Kind::Scalar, Some(head)) = (self.kind, &self.head) {
-            let mut lines = vec![format!(" {head}")];
-            lines.extend(indent(&self.body, body_column));
-            return join(&lines);
-        }
-        let step = if self.kind == Kind::Sequence && compact {
-            0
-        } else {
-            2
+        let (first, rest, column) = match self {
+            Self::Scalar { head, body } => (format!(" {head}"), body, body_column),
+            Self::Sequence(lines) if compact => (String::new(), lines, key_column),
+            Self::Sequence(lines) | Self::Mapping(lines) => (String::new(), lines, key_column + 2),
         };
-        let mut lines = vec![String::new()];
-        lines.extend(indent(&self.all_lines(), key_column + step));
+        let lines: Vec<String> = iter::once(first).chain(indent(rest, column)).collect();
         join(&lines)
     }
 
-    /// The text after `- `, for a dash at `dash_column`.
+    /// The text after `- `, for a dash at `dash_column`: the first line stays
+    /// on the dash's line and the rest sit under it.
     pub(crate) fn after_dash(&self, dash_column: usize) -> String {
-        let lines = self.all_lines();
-        let Some((first, rest)) = lines.split_first() else {
-            return String::new();
+        let (first, rest) = match self {
+            Self::Scalar { head, body } => (head.as_str(), body.as_slice()),
+            Self::Sequence(lines) | Self::Mapping(lines) => match lines.split_first() {
+                Some((first, rest)) => (first.as_str(), rest),
+                None => return String::new(),
+            },
         };
-        let mut placed = vec![first.clone()];
-        placed.extend(indent(rest, dash_column + 2));
-        join(&placed)
+        let lines: Vec<String> = iter::once(first.to_owned())
+            .chain(indent(rest, dash_column + 2))
+            .collect();
+        join(&lines)
     }
 
-    /// Whether the head is a block scalar header with an explicit
-    /// indentation indicator, which YAML measures from the key's indentation.
+    /// The single line of a scalar that fits on one line, such as a flow
+    /// value or a key.
+    pub(crate) fn inline_head(&self) -> Option<&str> {
+        match self {
+            Self::Scalar { head, body } if body.is_empty() => Some(head),
+            _ => None,
+        }
+    }
+
+    /// Whether the value is a block scalar with an explicit indentation
+    /// indicator, which YAML measures from the key's indentation.
     pub(crate) fn has_indicator(&self) -> bool {
-        self.head.as_deref().is_some_and(|head| {
-            head.starts_with(['>', '|']) && head.contains(|c: char| c.is_ascii_digit())
-        })
-    }
-
-    fn all_lines(&self) -> Vec<String> {
-        self.head
-            .iter()
-            .cloned()
-            .chain(self.body.iter().cloned())
-            .collect()
+        matches!(self, Self::Scalar { head, .. }
+            if head.starts_with(['>', '|']) && head.contains(|c: char| c.is_ascii_digit()))
     }
 }
 
@@ -119,33 +121,21 @@ pub(crate) fn value<T: Serialize + ?Sized>(
     let root = index.nodes.first().ok_or_else(|| Error::Serialize {
         message: "the value serialized to nothing".to_owned(),
     })?;
+    let lines = || yaml.lines().map(str::to_owned).collect();
     match root.style {
-        Style::BlockSequence | Style::BlockMapping => Ok(Rendered {
-            head: None,
-            body: yaml.lines().map(str::to_owned).collect(),
-            kind: if root.style == Style::BlockSequence {
-                Kind::Sequence
-            } else {
-                Kind::Mapping
-            },
-        }),
-        Style::FlowSequence | Style::FlowMapping | Style::Alias => Ok(inline(yaml.trim())),
+        Style::BlockSequence => Ok(Rendered::Sequence(lines())),
+        Style::BlockMapping => Ok(Rendered::Mapping(lines())),
+        Style::FlowSequence | Style::FlowMapping | Style::Alias => {
+            Ok(Rendered::inline(yaml.trim()))
+        }
         Style::Plain
         | Style::SingleQuoted
         | Style::DoubleQuoted
         | Style::Literal
         | Style::Folded => match read_string(&yaml) {
             Some(decoded) => text(&decoded, TextStyle::Auto, preferred),
-            None => Ok(inline(yaml.trim())),
+            None => Ok(Rendered::inline(yaml.trim())),
         },
-    }
-}
-
-fn inline(head: &str) -> Rendered {
-    Rendered {
-        head: Some(head.to_owned()),
-        body: Vec::new(),
-        kind: Kind::Scalar,
     }
 }
 
@@ -154,9 +144,8 @@ fn inline(head: &str) -> Rendered {
 /// quoted heads and nested flow collections pass through.
 pub(crate) fn flow_safe(head: &str) -> String {
     if head.starts_with(['\'', '"', '[', '{']) || !head.contains([',', '[', ']', '{', '}']) {
-        return head.to_owned();
-    }
-    if head.contains('\'') {
+        head.to_owned()
+    } else if head.contains('\'') {
         format!("\"{}\"", escape(head))
     } else {
         format!("'{head}'")
@@ -171,61 +160,60 @@ pub(crate) fn text(
     style: TextStyle,
     preferred: Option<Style>,
 ) -> Result<Rendered, Error> {
-    let mut order: Vec<Style> = Vec::new();
-    match style {
-        TextStyle::Folded => order.push(Style::Folded),
-        TextStyle::Literal => order.push(Style::Literal),
-        TextStyle::Auto => {}
-    }
-    order.extend(preferred.filter(|style| style.is_scalar()));
-    if value.contains(LF) {
-        order.push(Style::Literal);
-    }
-    order.extend([Style::Plain, Style::SingleQuoted, Style::DoubleQuoted]);
-    for candidate in order {
-        if let Some(rendered) = scalar(value, candidate)
-            && reads_back(&rendered, value)
-        {
-            return Ok(rendered);
-        }
-    }
-    Err(Error::Serialize {
-        message: "no scalar style reads back as this string".to_owned(),
-    })
+    let requested = match style {
+        TextStyle::Auto => None,
+        TextStyle::Folded => Some(Style::Folded),
+        TextStyle::Literal => Some(Style::Literal),
+    };
+    let multiline = value.contains(LF).then_some(Style::Literal);
+    requested
+        .into_iter()
+        .chain(preferred.filter(|style| style.is_scalar()))
+        .chain(multiline)
+        .chain([Style::Plain, Style::SingleQuoted, Style::DoubleQuoted])
+        .filter_map(|candidate| scalar(value, candidate))
+        .find(|rendered| reads_back(rendered, value))
+        .ok_or_else(|| Error::Serialize {
+            message: "no scalar style reads back as this string".to_owned(),
+        })
 }
 
 fn scalar(value: &str, style: Style) -> Option<Rendered> {
+    let one_line = !value.contains(LF);
     match style {
-        Style::Plain if !value.is_empty() && !value.contains(LF) => Some(inline(value)),
-        Style::SingleQuoted if !value.contains(LF) => {
-            Some(inline(&format!("'{}'", value.replace('\'', "''"))))
+        Style::Plain if one_line && !value.is_empty() => Some(Rendered::inline(value)),
+        Style::SingleQuoted if one_line => {
+            let quoted = format!("'{}'", value.replace('\'', "''"));
+            Some(Rendered::inline(quoted))
         }
-        Style::DoubleQuoted => Some(inline(&format!("\"{}\"", escape(value)))),
-        Style::Folded if !value.is_empty() && !value.contains(LF) => Some(Rendered {
-            head: Some(format!(">{}-", indicator(value))),
+        Style::DoubleQuoted => Some(Rendered::inline(format!("\"{}\"", escape(value)))),
+        Style::Folded if one_line && !value.is_empty() => Some(Rendered::Scalar {
+            head: format!(">{}-", indicator(value)),
             body: vec![value.to_owned()],
-            kind: Kind::Scalar,
         }),
-        Style::Literal if !value.is_empty() => {
-            let content = value.trim_end_matches(LF);
-            let trailing = value.len() - content.len();
-            let chomp = match trailing {
-                0 => "-",
-                1 => "",
-                _ => "+",
-            };
-            let mut body: Vec<String> = content.split(LF).map(str::to_owned).collect();
-            body.extend(std::iter::repeat_n(
-                String::new(),
-                trailing.saturating_sub(1),
-            ));
-            Some(Rendered {
-                head: Some(format!("|{}{chomp}", indicator(value))),
-                body,
-                kind: Kind::Scalar,
-            })
-        }
+        Style::Literal if !value.is_empty() => Some(literal(value)),
         _ => None,
+    }
+}
+
+/// A literal block whose chomping keeps exactly the trailing line breaks the
+/// text has: `|-` for none, `|` for one, `|+` for more.
+fn literal(value: &str) -> Rendered {
+    let content = value.trim_end_matches(LF);
+    let trailing = value.len() - content.len();
+    let chomp = match trailing {
+        0 => "-",
+        1 => "",
+        _ => "+",
+    };
+    let body = content
+        .split(LF)
+        .map(str::to_owned)
+        .chain(iter::repeat_n(String::new(), trailing.saturating_sub(1)))
+        .collect();
+    Rendered::Scalar {
+        head: format!("|{}{chomp}", indicator(value)),
+        body,
     }
 }
 
@@ -246,6 +234,7 @@ fn escape(value: &str) -> String {
             '\r' => out.push_str(r"\r"),
             '\0' => out.push_str(r"\0"),
             c if c.is_control() || matches!(c, '\u{85}' | '\u{2028}' | '\u{2029}' | '\u{feff}') => {
+                // Writing to a String cannot fail.
                 let _ = write!(out, r"\u{:04X}", u32::from(c));
             }
             c => out.push(c),
@@ -254,20 +243,23 @@ fn escape(value: &str) -> String {
     out
 }
 
-/// Whether the family's reader, `serde-saphyr` with strict booleans, reads the
-/// rendered text back as this exact string. A plain `true`, `4`, or `null`
-/// reads as another type and fails here.
+/// The family's reader settings: only `true` and `false` are booleans.
+fn reader() -> serde_saphyr::Options {
+    serde_saphyr::options! {
+        strict_booleans: true,
+    }
+}
+
+/// Whether the family's reader reads the rendered text back as this exact
+/// string. A plain `true`, `4`, or `null` reads as another type and fails.
 fn reads_back(rendered: &Rendered, expected: &str) -> bool {
     let probe = terminated(&format!("v:{}", rendered.after_key(0, false)));
-    let options = serde_saphyr::options! {
-        strict_booleans: true,
-    };
-    serde_saphyr::from_str_with_options::<BTreeMap<String, Captured>>(&probe, options).is_ok_and(
+    serde_saphyr::from_str_with_options::<BTreeMap<String, Captured>>(&probe, reader()).is_ok_and(
         |map| {
             map.len() == 1
                 && map
                     .get("v")
-                    .is_some_and(|v| v.0.as_deref() == Some(expected))
+                    .is_some_and(|value| value.0.as_deref() == Some(expected))
         },
     )
 }
@@ -275,10 +267,7 @@ fn reads_back(rendered: &Rendered, expected: &str) -> bool {
 /// The string a serialized scalar holds, or `None` when it reads as another
 /// type such as a number or a boolean.
 fn read_string(yaml: &str) -> Option<String> {
-    let options = serde_saphyr::options! {
-        strict_booleans: true,
-    };
-    serde_saphyr::from_str_with_options::<Captured>(yaml, options)
+    serde_saphyr::from_str_with_options::<Captured>(yaml, reader())
         .ok()?
         .0
 }
@@ -290,33 +279,43 @@ struct Captured(Option<String>);
 impl<'de> Deserialize<'de> for Captured {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         struct Probe;
+
         impl Visitor<'_> for Probe {
             type Value = Captured;
+
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
                 formatter.write_str("any scalar")
             }
+
             fn visit_str<E: de::Error>(self, value: &str) -> Result<Captured, E> {
                 Ok(Captured(Some(value.to_owned())))
             }
+
             fn visit_bool<E: de::Error>(self, _: bool) -> Result<Captured, E> {
                 Ok(Captured(None))
             }
+
             fn visit_i64<E: de::Error>(self, _: i64) -> Result<Captured, E> {
                 Ok(Captured(None))
             }
+
             fn visit_u64<E: de::Error>(self, _: u64) -> Result<Captured, E> {
                 Ok(Captured(None))
             }
+
             fn visit_f64<E: de::Error>(self, _: f64) -> Result<Captured, E> {
                 Ok(Captured(None))
             }
+
             fn visit_unit<E: de::Error>(self) -> Result<Captured, E> {
                 Ok(Captured(None))
             }
+
             fn visit_none<E: de::Error>(self) -> Result<Captured, E> {
                 Ok(Captured(None))
             }
         }
+
         deserializer.deserialize_any(Probe)
     }
 }

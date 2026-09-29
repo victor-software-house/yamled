@@ -58,13 +58,14 @@ which is the workaround qctl carries today.
 
 A compound value is serialized with `serde-saphyr` (indent step 2; its
 `yaml_12` option is left off because it emits a `%YAML` directive, and off it
-quotes YAML 1.1 words such as `no`) and re-indented to the target column. The list style (items under
-their key, or at the key's column) is detected from the first block list that
-is a mapping value in the file, and passed as `compact_list_indent`. A string
-scalar is written by yamled's own rule (plain, then single-quoted, then
-double-quoted, each checked by reading it back), because the style of one
-scalar is the part a person notices in a diff. Considered: `yaml_serde` for
-rendering, which lost because the family is leaving it.
+quotes YAML 1.1 words such as `no`) and re-indented to the target column. The
+list style (items under their key, or at the key's column) is detected from the
+first block list that is a mapping value in the file, and passed as
+`compact_list_indent`. A string scalar is written by yamled's own rule (plain,
+then single-quoted, then double-quoted, each checked by reading it back),
+because the style of one scalar is the part a person notices in a diff.
+Considered: `yaml_serde` for rendering, which lost because the family is
+leaving it.
 
 ### 6. Errors
 
@@ -84,16 +85,17 @@ same text reads back unchanged in block context. Emptying a keyed list writes
 comment; filling an empty list keeps the properties and the comment on the key
 line and writes the items below it. A replaced block scalar keeps its text
 column, except when it needs an indentation indicator, which YAML measures from
-the key: then the text goes two columns under the key. Removing the first key of a sequence item moves the comment lines
-owned by the next key above the item, so no neighbour's comment is lost.
+the key: then the text goes two columns under the key. Removing the first key
+of a sequence item moves the comment lines owned by the next key above the
+item, so no neighbour's comment is lost.
 
 ## Risks
 
 1. Flow collections other than an empty `[]` are refused by the edits in this
    change. A ledger that writes `blocked_by: [A-1]` can still replace the whole
    list, which rewrites that one line.
-2. The spike wrote `queue: ` with a trailing space when filling `queue: []`.
-   The put and push paths strip the space; a test covers it.
+2. The spike left a trailing space after `queue:` when filling `queue: []`.
+   The put and push paths write none; a test covers it.
 
 [yamlpath]: https://crates.io/crates/yamlpath
 [yamlpatch]: https://crates.io/crates/yamlpatch

@@ -6,7 +6,8 @@ use serde::Serialize;
 use crate::index::{Index, Location, Style};
 use crate::render::{self, Rendered, TextStyle};
 use crate::text::{
-    LF, column, dedent, has_blank_line, indent, join, line_end, line_start, starts_line,
+    LF, NEWLINE, column, dedent, has_blank_line, indent, join, line_end, line_start, starts_line,
+    terminated,
 };
 use crate::{Error, Path};
 
@@ -315,31 +316,27 @@ impl Document {
             Style::BlockSequence => {
                 let dash = column(&self.source, node.value.start);
                 let block = join(&indent(&lines, dash));
-                let separated = node.children.len() > 1 && {
-                    let first = node.children[0];
-                    let second = node.children[1];
-                    has_blank_line(
+                let separated = match node.children[..] {
+                    [first, second, ..] => has_blank_line(
                         &self.source,
                         line_end(&self.source, self.index.nodes[first].value.end),
                         self.index.owned_start(&self.source, second),
-                    )
+                    ),
+                    _ => false,
                 };
-                let gap = if separated {
-                    String::from(LF)
-                } else {
-                    String::new()
-                };
+                let gap = if separated { NEWLINE } else { "" };
                 if let Some(&child) = node.children.get(index) {
                     let at = self.index.owned_start(&self.source, child);
                     let text = format!("{block}{LF}{gap}");
                     self.commit_splice(at, at, &text)
-                } else if index == node.children.len() {
-                    let last = node.children[node.children.len() - 1];
+                } else if let Some(&last) = node.children.last()
+                    && index == node.children.len()
+                {
                     let at = line_end(&self.source, self.index.nodes[last].value.end);
                     let lead = if self.source[..at].ends_with(LF) {
-                        String::new()
+                        ""
                     } else {
-                        String::from(LF)
+                        NEWLINE
                     };
                     let text = format!("{lead}{gap}{block}{LF}");
                     self.commit_splice(at, at, &text)
@@ -357,22 +354,7 @@ impl Document {
                         path: path.clone().index(index),
                     });
                 }
-                let (colon, key_column) = self.colon(path, id)?;
-                let step = if self.compact { 0 } else { 2 };
-                let value = self.index.nodes[id].value.clone();
-                let (properties, comment) = self.key_line_parts(colon, Some(value));
-                let key_line_end = line_end(&self.source, colon);
-                let rest = spaced(&[&properties, &comment]);
-                let head = if rest.is_empty() {
-                    rest
-                } else {
-                    format!(" {rest}")
-                };
-                let mut placed = vec![head];
-                placed.extend(indent(&lines, key_column + step));
-                let mut with = join(&placed);
-                with.push(LF);
-                self.commit_splice(colon, key_line_end, &with)
+                self.fill_empty(path, id, &lines)
             }
             _ => Err(Error::WrongKind {
                 path: path.clone(),
@@ -429,7 +411,6 @@ impl Document {
         let node = &self.index.nodes[id];
         let value = node.value.clone();
         let parent_style = node.parent.map(|parent| self.index.nodes[parent].style);
-        let inline = rendered.body.is_empty() && rendered.head.is_some();
         match parent_style {
             Some(Style::BlockMapping) => {
                 let (colon, key_column) = self.colon(path, id)?;
@@ -445,8 +426,8 @@ impl Document {
                 let text = rendered.after_dash(column(&self.source, self.dash(id)));
                 self.commit_splice(value.start, value.end, &text)
             }
-            Some(_) if inline => {
-                let head = render::flow_safe(rendered.head.as_deref().unwrap_or_default());
+            Some(_) if let Some(head) = rendered.inline_head() => {
+                let head = render::flow_safe(head);
                 self.commit_splice(value.start, value.end, &head)
             }
             Some(_) => Err(Error::Unsupported {
@@ -454,27 +435,59 @@ impl Document {
                 what: "write a block value inside a flow collection",
             }),
             None => {
-                let lines: Vec<String> = rendered
-                    .head
-                    .iter()
-                    .chain(&rendered.body)
-                    .cloned()
-                    .collect();
-                self.commit_splice(value.start, value.end, &join(&lines))
+                let text = rendered.after_dash(0);
+                self.commit_splice(value.start, value.end, &text)
             }
         }
     }
 
-    /// What follows a key's `:` on its line, apart from `value`: node
-    /// properties such as `&anchor` or `!!tag`, and a trailing comment.
-    fn key_line_parts(&self, colon: usize, value: Option<Range<usize>>) -> (String, String) {
+    /// Write `lines` as the items of an empty value (`[]`, `~`, `null`, or
+    /// nothing) under its key. The key line keeps its node properties and
+    /// comment; an empty value on a later line is replaced with its line.
+    fn fill_empty(&mut self, path: &Path, id: usize, lines: &[String]) -> Result<(), Error> {
+        let (colon, key_column) = self.colon(path, id)?;
+        let value = self.index.nodes[id].value.clone();
+        let key_line_end = line_end(&self.source, colon);
+        let key_line_content =
+            key_line_end - usize::from(self.source[..key_line_end].ends_with(LF));
+        let (properties, mut comment) = self.key_line_parts(colon, Some(&value));
+        let end = if value.is_empty() || value.end <= key_line_content {
+            key_line_end
+        } else {
+            if value.start > key_line_content {
+                let between = &self.source[key_line_end..line_start(&self.source, value.start)];
+                if !between.trim().is_empty() {
+                    return Err(Error::Unsupported {
+                        path: path.clone(),
+                        what: "fill an empty value with comment lines above it",
+                    });
+                }
+            }
+            let end = line_end(&self.source, value.end);
+            comment = spaced(&[&comment, self.source[value.end..end].trim()]);
+            end
+        };
+        let head = spaced(&[&properties, &comment]);
+        let step = if self.compact { 0 } else { 2 };
+        let placed: Vec<String> = std::iter::once(if head.is_empty() {
+            head
+        } else {
+            format!(" {head}")
+        })
+        .chain(indent(lines, key_column + step))
+        .collect();
+        self.commit_splice(colon, end, &terminated(&join(&placed)))
+    }
+
+    /// What follows a key's `:` on its line, apart from the part of `value`
+    /// written there: node properties such as `&anchor` or `!!tag`, and a
+    /// trailing comment.
+    fn key_line_parts(&self, colon: usize, value: Option<&Range<usize>>) -> (String, String) {
         let end = line_end(&self.source, colon);
         let mut rest = self.source[colon..end].trim_end_matches(LF).to_owned();
-        if let Some(value) = value
-            && value.start >= colon
-            && value.end <= colon + rest.len()
-        {
-            rest.replace_range(value.start - colon..value.end - colon, "");
+        let line_content = colon + rest.len();
+        if let Some(value) = value.filter(|value| (colon..line_content).contains(&value.start)) {
+            rest.replace_range(value.start - colon..value.end.min(line_content) - colon, "");
         }
         let comment_at = rest
             .char_indices()
@@ -507,11 +520,12 @@ impl Document {
             let to = line_end(&self.source, self.index.nodes[id].value.end);
             return self.commit_splice(from, to, "");
         }
-        let position = siblings
-            .iter()
-            .position(|&sibling| sibling == id)
-            .unwrap_or(0);
-        let next = siblings[position + 1];
+        let Some(&[_, next]) = siblings.windows(2).find(|pair| pair[0] == id) else {
+            return Err(Error::Unsupported {
+                path: path.clone(),
+                what: "remove the last key of a mapping from its dash line",
+            });
+        };
         let next_entry = self.index.entry_start(next);
         let comments_start = self.index.owned_start(&self.source, next);
         let comments_end = line_start(&self.source, next_entry);
@@ -521,11 +535,10 @@ impl Document {
             .lines()
             .map(|comment| comment.trim_start().to_owned())
             .collect();
-        let mut with = String::new();
-        for comment in indent(&comments, dash_column) {
-            with.push_str(&comment);
-            with.push(LF);
-        }
+        let mut with: String = indent(&comments, dash_column)
+            .iter()
+            .map(|comment| terminated(comment))
+            .collect();
         with.push_str(&self.source[line..entry]);
         self.commit_splice(line, next_entry, &with)
     }
@@ -609,9 +622,10 @@ impl Document {
                 path: path.clone().key(key),
             });
         }
-        let key_text = render::text(key, TextStyle::Auto, None)?
-            .head
-            .unwrap_or_default();
+        let key_text = render::text(key, TextStyle::Auto, None)?;
+        let key_text = key_text.inline_head().ok_or_else(|| Error::Serialize {
+            message: format!("the key {key:?} needs more than one line"),
+        })?;
         let key_column = column(&self.source, self.index.entry_start(node.children[0]));
         let entry = format!(
             "{key_text}:{}",
@@ -625,31 +639,30 @@ impl Document {
                     path: path.clone().key(name),
                 })
         };
-        match position {
-            Position::End | Position::After(_) => {
-                let after = match position {
-                    Position::After(name) => anchor(name)?,
-                    _ => node.children[node.children.len() - 1],
-                };
-                let at = line_end(&self.source, self.index.nodes[after].value.end);
-                let lead = if self.source[..at].ends_with(LF) {
-                    String::new()
-                } else {
-                    String::from(LF)
-                };
-                self.commit_splice(at, at, &format!("{lead}{pad}{entry}{LF}"))
-            }
+        let after = match position {
+            Position::End => *node.children.last().ok_or_else(|| Error::WrongKind {
+                path: path.clone(),
+                expected: "a mapping with at least one entry",
+            })?,
+            Position::After(name) => anchor(name)?,
             Position::Before(name) => {
                 let before = anchor(name)?;
                 let start = self.index.entry_start(before);
-                if starts_line(&self.source, start) {
+                return if starts_line(&self.source, start) {
                     let at = self.index.owned_start(&self.source, before);
                     self.commit_splice(at, at, &format!("{pad}{entry}{LF}"))
                 } else {
                     self.commit_splice(start, start, &format!("{entry}{LF}{pad}"))
-                }
+                };
             }
-        }
+        };
+        let at = line_end(&self.source, self.index.nodes[after].value.end);
+        let lead = if self.source[..at].ends_with(LF) {
+            ""
+        } else {
+            NEWLINE
+        };
+        self.commit_splice(at, at, &format!("{lead}{pad}{entry}{LF}"))
     }
 
     fn push_rendered(&mut self, path: &Path, rendered: &Rendered) -> Result<(), Error> {
@@ -662,10 +675,7 @@ impl Document {
     }
 
     fn commit_splice(&mut self, from: usize, to: usize, with: &str) -> Result<(), Error> {
-        let mut edited = String::with_capacity(self.source.len() + with.len());
-        edited.push_str(&self.source[..from]);
-        edited.push_str(with);
-        edited.push_str(&self.source[to..]);
+        let edited = [&self.source[..from], with, &self.source[to..]].concat();
         let index = Index::build(&edited).map_err(|error| Error::Invalid {
             message: error.to_string(),
         })?;
@@ -687,8 +697,8 @@ impl fmt::Display for Document {
 fn spaced(parts: &[&str]) -> String {
     parts
         .iter()
-        .filter(|part| !part.is_empty())
         .copied()
+        .filter(|part| !part.is_empty())
         .collect::<Vec<_>>()
         .join(" ")
 }
