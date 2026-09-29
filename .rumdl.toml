@@ -1,6 +1,7 @@
 # Markdown lint, checked by `mise run lint:md`.
 [global]
-exclude = ["target/**"]
+# verctl writes CHANGELOG.md on the Version PR; nobody edits it by hand.
+exclude = ["target/**", "CHANGELOG.md"]
 
 [MD013]
 line-length = 80
