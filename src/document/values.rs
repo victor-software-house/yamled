@@ -325,7 +325,14 @@ impl Document {
                     .map_or(0, str::len);
                 node.value.start..node.value.start + header
             }
-            _ => node.value.clone(),
+            Style::Plain
+            | Style::SingleQuoted
+            | Style::DoubleQuoted
+            | Style::Alias
+            | Style::BlockSequence
+            | Style::FlowSequence
+            | Style::BlockMapping
+            | Style::FlowMapping => node.value.clone(),
         }
     }
 

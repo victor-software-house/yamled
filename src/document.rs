@@ -214,7 +214,13 @@ impl Document {
             }
             Style::BlockMapping => self.remove_entry(path, id, parent),
             Style::FlowSequence => self.remove_flow_item(path, id, parent),
-            _ => Err(Error::Unsupported {
+            Style::Plain
+            | Style::SingleQuoted
+            | Style::DoubleQuoted
+            | Style::Literal
+            | Style::Folded
+            | Style::Alias
+            | Style::FlowMapping => Err(Error::Unsupported {
                 path: path.clone(),
                 what: "remove from a flow mapping",
             }),
@@ -309,7 +315,15 @@ impl Document {
                 }
                 self.fill_empty(path, id, &lines)
             }
-            _ => Err(Error::WrongKind {
+            Style::Plain
+            | Style::SingleQuoted
+            | Style::DoubleQuoted
+            | Style::Literal
+            | Style::Folded
+            | Style::Alias
+            | Style::FlowSequence
+            | Style::BlockMapping
+            | Style::FlowMapping => Err(Error::WrongKind {
                 path: path.clone(),
                 expected: "a block sequence or an empty value",
             }),
@@ -359,7 +373,14 @@ impl Document {
         match node.style {
             Style::FlowSequence => node.children.is_empty(),
             Style::Plain => matches!(self.source[node.value.clone()].trim(), "" | "~" | "null"),
-            _ => false,
+            Style::SingleQuoted
+            | Style::DoubleQuoted
+            | Style::Literal
+            | Style::Folded
+            | Style::Alias
+            | Style::BlockSequence
+            | Style::BlockMapping
+            | Style::FlowMapping => false,
         }
     }
 

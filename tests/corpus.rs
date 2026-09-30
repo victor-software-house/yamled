@@ -2,7 +2,6 @@
 //! submodule. Every input yamled parses survives a replace of each scalar
 //! with its own value: the edit keeps every byte outside that node and the
 //! document's value. Every input it refuses fails with an error, not a panic.
-#![allow(missing_docs)]
 
 use std::fs;
 use std::path::PathBuf;
@@ -80,7 +79,9 @@ fn leaves(value: &Value, pointer: &str, out: &mut Vec<(String, Value)>) {
                 leaves(item, &format!("{pointer}/{key}"), out);
             }
         }
-        _ => out.push((pointer.to_owned(), value.clone())),
+        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => {
+            out.push((pointer.to_owned(), value.clone()));
+        }
     }
 }
 

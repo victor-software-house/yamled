@@ -70,8 +70,9 @@ mise run verify
 
 mise pins every tool, OpenSpec included (`npm:@fission-ai/openspec`, installed
 through Bun); do not use a global copy. Advisories run on CI only
-(`mise run deny:advisories`). Locally, `.miserc.toml` adds the `mbx` env, which
-routes Cargo through mr-boxington.
+(`mise run deny:advisories`). The `dev` env routes Cargo through mr-boxington
+(`mr_boxington = true` on the rust entry), locally and in CI, where
+`jdx/mr-boxington-action` restores the build cache.
 
 Tests put YAML in `indoc!` blocks. A unit test binds the expected text before
 the assertion (`let expected = indoc! {...}; assert_eq!(document.as_str(),

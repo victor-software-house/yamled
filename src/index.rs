@@ -152,6 +152,11 @@ impl Builder {
                     self.nodes[frame.node].value.end = end;
                 }
             }
+            Event::StreamStart | Event::StreamEnd | Event::DocumentEnd => {}
+            #[expect(
+                clippy::match_same_arms,
+                reason = "Event is non-exhaustive; a later variant carries nothing this index tracks"
+            )]
             _ => {}
         }
         Ok(())
@@ -173,7 +178,9 @@ impl Builder {
                 Some(header) => header..block_end(source, header, end),
                 None => start..trim_end(source, start, end),
             },
-            _ => start..trim_end(source, start, end),
+            ScalarStyle::Plain | ScalarStyle::SingleQuoted | ScalarStyle::DoubleQuoted => {
+                start..trim_end(source, start, end)
+            }
         };
         self.attach(Node::leaf(range, scalar_style(style)));
     }

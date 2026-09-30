@@ -2,7 +2,6 @@
 //! then the document reads back as the model says and every byte outside the
 //! edited collection is unchanged, or it is refused and the source is
 //! unchanged.
-#![allow(missing_docs)]
 
 use proptest::prelude::*;
 use proptest::test_runner::{TestCaseError, TestRunner};
@@ -260,7 +259,13 @@ fn apply(document: &mut Document, model: &mut Value, op: &Op) -> Result<bool, Er
             let order = ["rows", "tags", "title"].map(|key| Segment::Key(key.to_owned()));
             document.reorder(&root, &order)?;
         }
-        _ => return Ok(false),
+        Op::ReplaceTag(..)
+        | Op::RemoveTag(_)
+        | Op::ReplaceNote(..)
+        | Op::RemoveRow(_)
+        | Op::MoveRow(..)
+        | Op::ReorderRows(_)
+        | Op::Reindent(_) => return Ok(false),
     }
     model["tags"] = Value::Array(tag_list);
     model["rows"] = Value::Array(row_list);

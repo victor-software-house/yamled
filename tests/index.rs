@@ -1,5 +1,4 @@
 //! Paths, locations, styles, and comment ownership in the index.
-#![allow(missing_docs)]
 
 use indoc::indoc;
 use yamled::{Document, Error, Path, Segment, Style};

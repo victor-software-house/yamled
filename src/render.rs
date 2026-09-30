@@ -129,7 +129,7 @@ impl Rendered {
     pub(crate) fn inline_head(&self) -> Option<&str> {
         match self {
             Self::Scalar { head, body } if body.is_empty() => Some(head),
-            _ => None,
+            Self::Scalar { .. } | Self::Sequence(_) | Self::Mapping(_) => None,
         }
     }
 
@@ -215,7 +215,13 @@ pub(crate) fn flow_items<T: Serialize + ?Sized>(value: &T) -> Result<Option<Vec<
                             None => Some(written.to_owned()),
                         }
                     }
-                    _ => None,
+                    Style::Literal
+                    | Style::Folded
+                    | Style::Alias
+                    | Style::BlockSequence
+                    | Style::FlowSequence
+                    | Style::BlockMapping
+                    | Style::FlowMapping => None,
                 };
                 match item {
                     Some(item) => items.push(item),
@@ -224,7 +230,15 @@ pub(crate) fn flow_items<T: Serialize + ?Sized>(value: &T) -> Result<Option<Vec<
             }
             Ok(Some(items))
         }
-        _ => Ok(None),
+        Style::Plain
+        | Style::SingleQuoted
+        | Style::DoubleQuoted
+        | Style::Literal
+        | Style::Folded
+        | Style::Alias
+        | Style::FlowSequence
+        | Style::BlockMapping
+        | Style::FlowMapping => Ok(None),
     }
 }
 
@@ -291,7 +305,15 @@ fn scalar(value: &str, style: Style) -> Option<Rendered> {
             body: vec![value.to_owned()],
         }),
         Style::Literal if !value.is_empty() => Some(literal(value)),
-        _ => None,
+        Style::Plain
+        | Style::SingleQuoted
+        | Style::Literal
+        | Style::Folded
+        | Style::Alias
+        | Style::BlockSequence
+        | Style::FlowSequence
+        | Style::BlockMapping
+        | Style::FlowMapping => None,
     }
 }
 

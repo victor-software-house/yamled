@@ -6,7 +6,6 @@
 //! file is recorded as a snapshot with every line marked removed (`-`),
 //! added (`+`), or kept (` `), so the snapshot is both the result and the
 //! diff that proves nothing else moved.
-#![allow(missing_docs)]
 
 use indoc::{formatdoc, indoc};
 use serde::Serialize;
