@@ -1,5 +1,4 @@
 //! Each edit changes only the bytes it names.
-#![allow(missing_docs)]
 
 use std::collections::BTreeMap;
 

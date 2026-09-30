@@ -150,7 +150,14 @@ impl Document {
         let id = self.id(path)?;
         match self.index.nodes[id].style {
             Style::BlockSequence | Style::BlockMapping => Ok(id),
-            _ => Err(Error::WrongKind {
+            Style::Plain
+            | Style::SingleQuoted
+            | Style::DoubleQuoted
+            | Style::Literal
+            | Style::Folded
+            | Style::Alias
+            | Style::FlowSequence
+            | Style::FlowMapping => Err(Error::WrongKind {
                 path: path.clone(),
                 expected: "a block sequence or mapping",
             }),

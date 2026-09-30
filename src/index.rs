@@ -152,7 +152,7 @@ impl Builder {
                     self.nodes[frame.node].value.end = end;
                 }
             }
-            _ => {}
+            Event::StreamStart | Event::StreamEnd | Event::DocumentEnd | _ => {}
         }
         Ok(())
     }
@@ -173,7 +173,9 @@ impl Builder {
                 Some(header) => header..block_end(source, header, end),
                 None => start..trim_end(source, start, end),
             },
-            _ => start..trim_end(source, start, end),
+            ScalarStyle::Plain | ScalarStyle::SingleQuoted | ScalarStyle::DoubleQuoted => {
+                start..trim_end(source, start, end)
+            }
         };
         self.attach(Node::leaf(range, scalar_style(style)));
     }
