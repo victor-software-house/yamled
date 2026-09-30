@@ -490,9 +490,9 @@ url_api = "https://api.github.com/repos/rvben/rumdl/releases/assets/583859183"
 provenance = "github-attestations"
 
 [[tools.rust]]
-version = "nightly-2026-09-28"
+version = "nightly-2026-09-29"
 backend = "core:rust"
-specifiers = ["nightly"]
+specifiers = ["nightly-2026-09-29"]
 
 [tools.rust.options]
 components = "clippy,rustfmt"
