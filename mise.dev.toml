@@ -29,8 +29,9 @@ run = "cargo clippy --no-default-features --all-targets -- -D warnings"
 [tasks.test]
 description = "Unit, integration, and doc-tests"
 run = "cargo test --all-features"
-# Stops a hung test run instead of holding the gate. The limit includes compile time.
-timeout = "10m"
+# Stops a hung test run instead of holding the gate. The limit also counts
+# compile time and waits on the target/ lock, so it sits far above a cold build.
+timeout = "30m"
 
 [tasks.snapshots]
 description = "Review and accept changed snapshots"
