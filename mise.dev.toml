@@ -5,7 +5,6 @@
 committed = "1.1.11"
 lefthook = "2.1.10"
 rust = { version = "nightly", components = "rustfmt,clippy" }
-"github:nextest-rs/nextest" = "cargo-nextest-0.9.143"
 "github:EmbarkStudios/cargo-deny" = "0.20.2"
 "github:bnjbvr/cargo-machete" = "0.9.2"
 bun = "1.4.2"
@@ -28,12 +27,10 @@ description = "Lint the crate and its tests without the serde feature"
 run = "cargo clippy --no-default-features --all-targets -- -D warnings"
 
 [tasks.test]
-description = "Parallel tests via nextest"
-run = "cargo nextest run --all-features"
-
-[tasks."test:doc"]
-description = "Doc-tests (nextest does not run these)"
-run = "cargo test --doc --all-features"
+description = "Unit, integration, and doc-tests"
+run = "cargo test --all-features"
+# Stops a hung test run instead of holding the gate. The limit includes compile time.
+timeout = "10m"
 
 [tasks.snapshots]
 description = "Review and accept changed snapshots"
@@ -83,7 +80,7 @@ description = "Validate every OpenSpec change and spec"
 run = "openspec validate --all --strict"
 
 [tasks.verify]
-description = "Format, lint (Rust, TOML, Markdown, spelling, workflows), feature sets, nextest, doc-tests, deny, unused crates, OpenSpec"
+description = "Format, lint (Rust, TOML, Markdown, spelling, workflows), feature sets, tests, deny, unused crates, OpenSpec"
 depends = [
   "format",
   "format:toml",
@@ -93,7 +90,6 @@ depends = [
   "lint:workflows",
   "check:features",
   "test",
-  "test:doc",
   "deny",
   "deps",
   "specs",

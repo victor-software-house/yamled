@@ -57,8 +57,13 @@ mise run verify
 `verify` runs, in parallel:
 
 1. Rust: rustfmt, clippy (pedantic, denied) with all features and again with
-   none, nextest, doc-tests, cargo-deny licenses, bans, and sources, and
-   cargo-machete.
+   none, `cargo test` (unit, integration, and doc-tests), cargo-deny
+   licenses, bans, and sources, and cargo-machete.
+   Tests run under plain `cargo test`. Measured on Linux and macOS with
+   doc-tests included, cargo-nextest was 1.05 to 14 times slower (it starts
+   one process per test), and mbx test scheduling or a `RUST_TEST_THREADS`
+   cap slowed concurrent runs. Do not reintroduce them without new
+   measurements.
 2. Everything else: taplo for TOML (`.taplo.toml`), rumdl for Markdown
    (`.rumdl.toml`), typos for spelling, actionlint for workflows, and
    `openspec validate --all --strict`.
