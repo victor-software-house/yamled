@@ -152,7 +152,12 @@ impl Builder {
                     self.nodes[frame.node].value.end = end;
                 }
             }
-            Event::StreamStart | Event::StreamEnd | Event::DocumentEnd | _ => {}
+            Event::StreamStart | Event::StreamEnd | Event::DocumentEnd => {}
+            #[expect(
+                clippy::match_same_arms,
+                reason = "Event is non-exhaustive; a later variant carries nothing this index tracks"
+            )]
+            _ => {}
         }
         Ok(())
     }
