@@ -1,4 +1,4 @@
-# Loaded before any mise.toml. Local default is the compile toolchain
-# plus the mbx build cache.
+# Loaded before any mise.toml. Local default is the compile toolchain, whose
+# Cargo runs through the mbx build cache.
 # CI overrides: MISE_ENV=dev | release | dev,release
-env = ["dev", "mbx"]
+env = ["dev"]

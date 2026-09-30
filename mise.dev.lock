@@ -378,6 +378,41 @@ url = "https://github.com/evilmartians/lefthook/releases/download/v2.1.10/leftho
 url_api = "https://api.github.com/repos/evilmartians/lefthook/releases/assets/470227505"
 provenance = "github-attestations"
 
+[[tools.mr-boxington]]
+version = "1.20.0"
+backend = "packslip:github.com/jdx/mr-boxington"
+specifiers = ["1.20.0"]
+
+[tools.mr-boxington."platforms.linux-arm64"]
+checksum = "sha256:ce9f353547ea3e71642b44726a6d7ee503fabb93380176ada644a6e5eb8e6809"
+url = "https://github.com/jdx/mr-boxington/releases/download/v1.20.0/mbx-aarch64-unknown-linux-gnu.tar.gz"
+signer = "sigstore-oidc:https://github.com/jdx/mr-boxington/.github/workflows/release.yml"
+
+[tools.mr-boxington."platforms.linux-arm64-musl"]
+checksum = "sha256:2d91c8c06d912a53a3f56512326a65eadbad5e70b34c28ceed8ec0e923bdfdc1"
+url = "https://github.com/jdx/mr-boxington/releases/download/v1.20.0/mbx-aarch64-unknown-linux-musl.tar.gz"
+signer = "sigstore-oidc:https://github.com/jdx/mr-boxington/.github/workflows/release.yml"
+
+[tools.mr-boxington."platforms.linux-x64"]
+checksum = "sha256:f3537f6a2a7d3eaef5840fcd0bfccb108941f7a7ab395ec82914fd99c91ff357"
+url = "https://github.com/jdx/mr-boxington/releases/download/v1.20.0/mbx-x86_64-unknown-linux-gnu.tar.gz"
+signer = "sigstore-oidc:https://github.com/jdx/mr-boxington/.github/workflows/release.yml"
+
+[tools.mr-boxington."platforms.linux-x64-musl"]
+checksum = "sha256:c9dbbde6105aa852bcf3b8df616243225b14099ccdafd0923f6d7d181d55c93f"
+url = "https://github.com/jdx/mr-boxington/releases/download/v1.20.0/mbx-x86_64-unknown-linux-musl.tar.gz"
+signer = "sigstore-oidc:https://github.com/jdx/mr-boxington/.github/workflows/release.yml"
+
+[tools.mr-boxington."platforms.macos-arm64"]
+checksum = "sha256:0b4b12d09dd4cc4571a53472823dd04a987d0105e162ed2d383d73e22f17a602"
+url = "https://github.com/jdx/mr-boxington/releases/download/v1.20.0/mbx-aarch64-apple-darwin.tar.gz"
+signer = "sigstore-oidc:https://github.com/jdx/mr-boxington/.github/workflows/release.yml"
+
+[tools.mr-boxington."platforms.windows-x64"]
+checksum = "sha256:b31c4995a2293eedb3fdc4a67eb17d2df39a4d5e5928d774dbe90146ee6d799f"
+url = "https://github.com/jdx/mr-boxington/releases/download/v1.20.0/mbx-x86_64-pc-windows-msvc.zip"
+signer = "sigstore-oidc:https://github.com/jdx/mr-boxington/.github/workflows/release.yml"
+
 [[tools."npm:@fission-ai/openspec"]]
 version = "1.13.2"
 backend = "npm:@fission-ai/openspec"
