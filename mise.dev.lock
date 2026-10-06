@@ -122,56 +122,6 @@ url = "https://github.com/oven-sh/bun/releases/download/bun-v1.4.2/bun-windows-x
 checksum = "sha256:78c221c2376f79731ccf4e4af0b3bb46d81fefa3296c5abee09ad8a1b21e68c6"
 url = "https://github.com/oven-sh/bun/releases/download/bun-v1.4.2/bun-windows-x64-baseline.zip"
 
-[[tools.committed]]
-version = "1.1.11"
-backend = "aqua:crate-ci/committed"
-specifiers = ["1.1.11"]
-
-[tools.committed."platforms.linux-x64"]
-checksum = "sha256:1e5c20049eeaa4633e6798283913f92dc90a97f2b5c6dfc28e8c4b7e77a67157"
-url = "https://github.com/crate-ci/committed/releases/download/v1.1.11/committed-v1.1.11-x86_64-unknown-linux-musl.tar.gz"
-url_api = "https://api.github.com/repos/crate-ci/committed/releases/assets/361544963"
-
-[tools.committed."platforms.linux-x64-baseline"]
-checksum = "sha256:1e5c20049eeaa4633e6798283913f92dc90a97f2b5c6dfc28e8c4b7e77a67157"
-url = "https://github.com/crate-ci/committed/releases/download/v1.1.11/committed-v1.1.11-x86_64-unknown-linux-musl.tar.gz"
-url_api = "https://api.github.com/repos/crate-ci/committed/releases/assets/361544963"
-
-[tools.committed."platforms.linux-x64-musl"]
-checksum = "sha256:1e5c20049eeaa4633e6798283913f92dc90a97f2b5c6dfc28e8c4b7e77a67157"
-url = "https://github.com/crate-ci/committed/releases/download/v1.1.11/committed-v1.1.11-x86_64-unknown-linux-musl.tar.gz"
-url_api = "https://api.github.com/repos/crate-ci/committed/releases/assets/361544963"
-
-[tools.committed."platforms.linux-x64-musl-baseline"]
-checksum = "sha256:1e5c20049eeaa4633e6798283913f92dc90a97f2b5c6dfc28e8c4b7e77a67157"
-url = "https://github.com/crate-ci/committed/releases/download/v1.1.11/committed-v1.1.11-x86_64-unknown-linux-musl.tar.gz"
-url_api = "https://api.github.com/repos/crate-ci/committed/releases/assets/361544963"
-
-[tools.committed."platforms.macos-arm64"]
-checksum = "sha256:b1718d951c8a90539ffb7a81145fdadf81c6c9a1f17560be433a74c5b3f7bfca"
-url = "https://github.com/crate-ci/committed/releases/download/v1.1.11/committed-v1.1.11-x86_64-apple-darwin.tar.gz"
-url_api = "https://api.github.com/repos/crate-ci/committed/releases/assets/361544941"
-
-[tools.committed."platforms.macos-x64"]
-checksum = "sha256:b1718d951c8a90539ffb7a81145fdadf81c6c9a1f17560be433a74c5b3f7bfca"
-url = "https://github.com/crate-ci/committed/releases/download/v1.1.11/committed-v1.1.11-x86_64-apple-darwin.tar.gz"
-url_api = "https://api.github.com/repos/crate-ci/committed/releases/assets/361544941"
-
-[tools.committed."platforms.macos-x64-baseline"]
-checksum = "sha256:b1718d951c8a90539ffb7a81145fdadf81c6c9a1f17560be433a74c5b3f7bfca"
-url = "https://github.com/crate-ci/committed/releases/download/v1.1.11/committed-v1.1.11-x86_64-apple-darwin.tar.gz"
-url_api = "https://api.github.com/repos/crate-ci/committed/releases/assets/361544941"
-
-[tools.committed."platforms.windows-x64"]
-checksum = "sha256:af4f5a65320471751ed1dfbb5502f15f4857cea797b077c6049acb2b995d293b"
-url = "https://github.com/crate-ci/committed/releases/download/v1.1.11/committed-v1.1.11-x86_64-pc-windows-msvc.zip"
-url_api = "https://api.github.com/repos/crate-ci/committed/releases/assets/361545840"
-
-[tools.committed."platforms.windows-x64-baseline"]
-checksum = "sha256:af4f5a65320471751ed1dfbb5502f15f4857cea797b077c6049acb2b995d293b"
-url = "https://github.com/crate-ci/committed/releases/download/v1.1.11/committed-v1.1.11-x86_64-pc-windows-msvc.zip"
-url_api = "https://api.github.com/repos/crate-ci/committed/releases/assets/361545840"
-
 [[tools."github:EmbarkStudios/cargo-deny"]]
 version = "0.20.2"
 backend = "github:EmbarkStudios/cargo-deny"
@@ -291,6 +241,66 @@ url_api = "https://api.github.com/repos/bnjbvr/cargo-machete/releases/assets/397
 checksum = "sha256:996120ac70afe405c58fce508a476f25bb71032c6fb8013aa0123bba36429c76"
 url = "https://github.com/bnjbvr/cargo-machete/releases/download/v0.9.2/cargo-machete-v0.9.2-x86_64-pc-windows-msvc.tar.gz"
 url_api = "https://api.github.com/repos/bnjbvr/cargo-machete/releases/assets/397131414"
+
+[[tools."github:crate-ci/committed"]]
+version = "1.1.11"
+backend = "github:crate-ci/committed"
+specifiers = ["1.1.11"]
+
+[tools."github:crate-ci/committed"."platforms.linux-arm64"]
+checksum = "sha256:96d6334ab2dccc0e90b67ebdcaa2af856f29eadef48161926e21a0e35f1ae80d"
+url = "https://github.com/crate-ci/committed/releases/download/v1.1.11/committed-v1.1.11-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/crate-ci/committed/releases/assets/361545435"
+
+[tools."github:crate-ci/committed"."platforms.linux-arm64-musl"]
+checksum = "sha256:96d6334ab2dccc0e90b67ebdcaa2af856f29eadef48161926e21a0e35f1ae80d"
+url = "https://github.com/crate-ci/committed/releases/download/v1.1.11/committed-v1.1.11-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/crate-ci/committed/releases/assets/361545435"
+
+[tools."github:crate-ci/committed"."platforms.linux-x64"]
+checksum = "sha256:1e5c20049eeaa4633e6798283913f92dc90a97f2b5c6dfc28e8c4b7e77a67157"
+url = "https://github.com/crate-ci/committed/releases/download/v1.1.11/committed-v1.1.11-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/crate-ci/committed/releases/assets/361544963"
+
+[tools."github:crate-ci/committed"."platforms.linux-x64-baseline"]
+checksum = "sha256:1e5c20049eeaa4633e6798283913f92dc90a97f2b5c6dfc28e8c4b7e77a67157"
+url = "https://github.com/crate-ci/committed/releases/download/v1.1.11/committed-v1.1.11-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/crate-ci/committed/releases/assets/361544963"
+
+[tools."github:crate-ci/committed"."platforms.linux-x64-musl"]
+checksum = "sha256:1e5c20049eeaa4633e6798283913f92dc90a97f2b5c6dfc28e8c4b7e77a67157"
+url = "https://github.com/crate-ci/committed/releases/download/v1.1.11/committed-v1.1.11-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/crate-ci/committed/releases/assets/361544963"
+
+[tools."github:crate-ci/committed"."platforms.linux-x64-musl-baseline"]
+checksum = "sha256:1e5c20049eeaa4633e6798283913f92dc90a97f2b5c6dfc28e8c4b7e77a67157"
+url = "https://github.com/crate-ci/committed/releases/download/v1.1.11/committed-v1.1.11-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/crate-ci/committed/releases/assets/361544963"
+
+[tools."github:crate-ci/committed"."platforms.macos-arm64"]
+checksum = "sha256:98eae08e1b0715ef6446c4bd08352f21f3a3ce21535a35687a1e132bcb4fcac1"
+url = "https://github.com/crate-ci/committed/releases/download/v1.1.11/committed-v1.1.11-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/crate-ci/committed/releases/assets/362199688"
+
+[tools."github:crate-ci/committed"."platforms.macos-x64"]
+checksum = "sha256:b1718d951c8a90539ffb7a81145fdadf81c6c9a1f17560be433a74c5b3f7bfca"
+url = "https://github.com/crate-ci/committed/releases/download/v1.1.11/committed-v1.1.11-x86_64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/crate-ci/committed/releases/assets/361544941"
+
+[tools."github:crate-ci/committed"."platforms.macos-x64-baseline"]
+checksum = "sha256:b1718d951c8a90539ffb7a81145fdadf81c6c9a1f17560be433a74c5b3f7bfca"
+url = "https://github.com/crate-ci/committed/releases/download/v1.1.11/committed-v1.1.11-x86_64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/crate-ci/committed/releases/assets/361544941"
+
+[tools."github:crate-ci/committed"."platforms.windows-x64"]
+checksum = "sha256:af4f5a65320471751ed1dfbb5502f15f4857cea797b077c6049acb2b995d293b"
+url = "https://github.com/crate-ci/committed/releases/download/v1.1.11/committed-v1.1.11-x86_64-pc-windows-msvc.zip"
+url_api = "https://api.github.com/repos/crate-ci/committed/releases/assets/361545840"
+
+[tools."github:crate-ci/committed"."platforms.windows-x64-baseline"]
+checksum = "sha256:af4f5a65320471751ed1dfbb5502f15f4857cea797b077c6049acb2b995d293b"
+url = "https://github.com/crate-ci/committed/releases/download/v1.1.11/committed-v1.1.11-x86_64-pc-windows-msvc.zip"
+url_api = "https://api.github.com/repos/crate-ci/committed/releases/assets/361545840"
 
 [[tools."github:mitsuhiko/insta"]]
 version = "1.48.0"
