@@ -292,12 +292,77 @@ checksum = "sha256:996120ac70afe405c58fce508a476f25bb71032c6fb8013aa0123bba36429
 url = "https://github.com/bnjbvr/cargo-machete/releases/download/v0.9.2/cargo-machete-v0.9.2-x86_64-pc-windows-msvc.tar.gz"
 url_api = "https://api.github.com/repos/bnjbvr/cargo-machete/releases/assets/397131414"
 
+[[tools."github:mitsuhiko/insta"]]
+version = "1.48.0"
+backend = "github:mitsuhiko/insta"
+specifiers = ["1.48.0"]
+
+[tools."github:mitsuhiko/insta"."platforms.linux-x64"]
+checksum = "sha256:1c05a480a5a7f755f0ea15b2d8e2f71ad51b9c3a270d38ac72005c57ac0a1487"
+url = "https://github.com/mitsuhiko/insta/releases/download/1.48.0/cargo-insta-x86_64-unknown-linux-gnu.tar.xz"
+url_api = "https://api.github.com/repos/mitsuhiko/insta/releases/assets/444757866"
+
+[tools."github:mitsuhiko/insta"."platforms.linux-x64-baseline"]
+checksum = "sha256:1c05a480a5a7f755f0ea15b2d8e2f71ad51b9c3a270d38ac72005c57ac0a1487"
+url = "https://github.com/mitsuhiko/insta/releases/download/1.48.0/cargo-insta-x86_64-unknown-linux-gnu.tar.xz"
+url_api = "https://api.github.com/repos/mitsuhiko/insta/releases/assets/444757866"
+
+[tools."github:mitsuhiko/insta"."platforms.linux-x64-musl"]
+checksum = "sha256:703aa7d151ae59cac0bf8e7c2c27da4aca8070f3cb178f624ae10621ef77f5f5"
+url = "https://github.com/mitsuhiko/insta/releases/download/1.48.0/cargo-insta-x86_64-unknown-linux-musl.tar.xz"
+url_api = "https://api.github.com/repos/mitsuhiko/insta/releases/assets/444757872"
+
+[tools."github:mitsuhiko/insta"."platforms.linux-x64-musl-baseline"]
+checksum = "sha256:703aa7d151ae59cac0bf8e7c2c27da4aca8070f3cb178f624ae10621ef77f5f5"
+url = "https://github.com/mitsuhiko/insta/releases/download/1.48.0/cargo-insta-x86_64-unknown-linux-musl.tar.xz"
+url_api = "https://api.github.com/repos/mitsuhiko/insta/releases/assets/444757872"
+
+[tools."github:mitsuhiko/insta"."platforms.macos-arm64"]
+checksum = "sha256:26f081f5bf62d1dc03aae9c4137188d66a2debe6bcaf2884f2153fcb6eda27cb"
+url = "https://github.com/mitsuhiko/insta/releases/download/1.48.0/cargo-insta-aarch64-apple-darwin.tar.xz"
+url_api = "https://api.github.com/repos/mitsuhiko/insta/releases/assets/444757856"
+
+[tools."github:mitsuhiko/insta"."platforms.macos-x64"]
+checksum = "sha256:e2d6d6fa4bcb30f7d4834f6254a6da7f2982a9e9a3882695aca5e83d64231267"
+url = "https://github.com/mitsuhiko/insta/releases/download/1.48.0/cargo-insta-x86_64-apple-darwin.tar.xz"
+url_api = "https://api.github.com/repos/mitsuhiko/insta/releases/assets/444757859"
+
+[tools."github:mitsuhiko/insta"."platforms.macos-x64-baseline"]
+checksum = "sha256:e2d6d6fa4bcb30f7d4834f6254a6da7f2982a9e9a3882695aca5e83d64231267"
+url = "https://github.com/mitsuhiko/insta/releases/download/1.48.0/cargo-insta-x86_64-apple-darwin.tar.xz"
+url_api = "https://api.github.com/repos/mitsuhiko/insta/releases/assets/444757859"
+
+[tools."github:mitsuhiko/insta"."platforms.windows-x64"]
+checksum = "sha256:7e23929588aaf5daff1e93bfc4addca7ccf55195444e84552b6588c9d864642e"
+url = "https://github.com/mitsuhiko/insta/releases/download/1.48.0/cargo-insta-x86_64-pc-windows-msvc.zip"
+url_api = "https://api.github.com/repos/mitsuhiko/insta/releases/assets/444757862"
+
+[tools."github:mitsuhiko/insta"."platforms.windows-x64-baseline"]
+checksum = "sha256:7e23929588aaf5daff1e93bfc4addca7ccf55195444e84552b6588c9d864642e"
+url = "https://github.com/mitsuhiko/insta/releases/download/1.48.0/cargo-insta-x86_64-pc-windows-msvc.zip"
+url_api = "https://api.github.com/repos/mitsuhiko/insta/releases/assets/444757862"
+
 [[tools."github:victor-software-house/qctl"]]
 version = "0.4.4"
 backend = "github:victor-software-house/qctl"
 specifiers = ["0.4.4"]
 
 [tools."github:victor-software-house/qctl"."platforms.linux-x64"]
+checksum = "sha256:1bf045b16e2116b9a18cff86dc4066534439472a49d8b3891b07db5512c16a60"
+url = "https://github.com/victor-software-house/qctl/releases/download/v0.4.4/qctl_0.4.4_linux_x64.tar.gz"
+url_api = "https://api.github.com/repos/victor-software-house/qctl/releases/assets/584951917"
+
+[tools."github:victor-software-house/qctl"."platforms.linux-x64-baseline"]
+checksum = "sha256:1bf045b16e2116b9a18cff86dc4066534439472a49d8b3891b07db5512c16a60"
+url = "https://github.com/victor-software-house/qctl/releases/download/v0.4.4/qctl_0.4.4_linux_x64.tar.gz"
+url_api = "https://api.github.com/repos/victor-software-house/qctl/releases/assets/584951917"
+
+[tools."github:victor-software-house/qctl"."platforms.linux-x64-musl"]
+checksum = "sha256:1bf045b16e2116b9a18cff86dc4066534439472a49d8b3891b07db5512c16a60"
+url = "https://github.com/victor-software-house/qctl/releases/download/v0.4.4/qctl_0.4.4_linux_x64.tar.gz"
+url_api = "https://api.github.com/repos/victor-software-house/qctl/releases/assets/584951917"
+
+[tools."github:victor-software-house/qctl"."platforms.linux-x64-musl-baseline"]
 checksum = "sha256:1bf045b16e2116b9a18cff86dc4066534439472a49d8b3891b07db5512c16a60"
 url = "https://github.com/victor-software-house/qctl/releases/download/v0.4.4/qctl_0.4.4_linux_x64.tar.gz"
 url_api = "https://api.github.com/repos/victor-software-house/qctl/releases/assets/584951917"
@@ -398,7 +463,17 @@ checksum = "sha256:f3537f6a2a7d3eaef5840fcd0bfccb108941f7a7ab395ec82914fd99c91ff
 url = "https://github.com/jdx/mr-boxington/releases/download/v1.20.0/mbx-x86_64-unknown-linux-gnu.tar.gz"
 signer = "sigstore-oidc:https://github.com/jdx/mr-boxington/.github/workflows/release.yml"
 
+[tools.mr-boxington."platforms.linux-x64-baseline"]
+checksum = "sha256:f3537f6a2a7d3eaef5840fcd0bfccb108941f7a7ab395ec82914fd99c91ff357"
+url = "https://github.com/jdx/mr-boxington/releases/download/v1.20.0/mbx-x86_64-unknown-linux-gnu.tar.gz"
+signer = "sigstore-oidc:https://github.com/jdx/mr-boxington/.github/workflows/release.yml"
+
 [tools.mr-boxington."platforms.linux-x64-musl"]
+checksum = "sha256:c9dbbde6105aa852bcf3b8df616243225b14099ccdafd0923f6d7d181d55c93f"
+url = "https://github.com/jdx/mr-boxington/releases/download/v1.20.0/mbx-x86_64-unknown-linux-musl.tar.gz"
+signer = "sigstore-oidc:https://github.com/jdx/mr-boxington/.github/workflows/release.yml"
+
+[tools.mr-boxington."platforms.linux-x64-musl-baseline"]
 checksum = "sha256:c9dbbde6105aa852bcf3b8df616243225b14099ccdafd0923f6d7d181d55c93f"
 url = "https://github.com/jdx/mr-boxington/releases/download/v1.20.0/mbx-x86_64-unknown-linux-musl.tar.gz"
 signer = "sigstore-oidc:https://github.com/jdx/mr-boxington/.github/workflows/release.yml"
@@ -409,6 +484,11 @@ url = "https://github.com/jdx/mr-boxington/releases/download/v1.20.0/mbx-aarch64
 signer = "sigstore-oidc:https://github.com/jdx/mr-boxington/.github/workflows/release.yml"
 
 [tools.mr-boxington."platforms.windows-x64"]
+checksum = "sha256:b31c4995a2293eedb3fdc4a67eb17d2df39a4d5e5928d774dbe90146ee6d799f"
+url = "https://github.com/jdx/mr-boxington/releases/download/v1.20.0/mbx-x86_64-pc-windows-msvc.zip"
+signer = "sigstore-oidc:https://github.com/jdx/mr-boxington/.github/workflows/release.yml"
+
+[tools.mr-boxington."platforms.windows-x64-baseline"]
 checksum = "sha256:b31c4995a2293eedb3fdc4a67eb17d2df39a4d5e5928d774dbe90146ee6d799f"
 url = "https://github.com/jdx/mr-boxington/releases/download/v1.20.0/mbx-x86_64-pc-windows-msvc.zip"
 signer = "sigstore-oidc:https://github.com/jdx/mr-boxington/.github/workflows/release.yml"
