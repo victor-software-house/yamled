@@ -1,8 +1,18 @@
 # yaml-language-server: $schema=https://github.com/victor-software-house/qctl/releases/download/v0.4.4/tasks.schema.json
 schema_version: 4
 prefix: YMD
-active: null
-queue: []
+active: YMD-006
+queue:
+  - id: YMD-006
+    title: Run the shared Rust tasks on the pinned stable
+    scope: yamled
+    outcome: yamled builds, lints, and tests on Rust 1.99.0 through ctl-core's shared tasks, so a fix to a shared task reaches yamled by a ref bump.
+    blocked_by: []
+    acceptance:
+      - mise.toml includes ctl-core's tasks/rust.toml at v0.6.13, and mise.dev.toml keeps only yamled's own tasks.
+      - rust-toolchain.toml, rust-version, and the mise rust entry pin 1.99.0; rustfmt runs on nightly-2026-09-29.
+      - mise run verify passes on a fresh machine and in CI.
+    plan: https://github.com/victor-software-house/ctl-core/tree/1f87bdbe2def7ea51af38c2a83e32281f74432ed/openspec/changes/shared-rust-tasks
 archive:
   - id: YMD-005
     title: Name the tag that refuses a replace
