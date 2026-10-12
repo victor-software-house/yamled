@@ -56,9 +56,16 @@ mise run verify
 
 `verify` runs, in parallel:
 
-1. Rust: rustfmt, clippy (pedantic, denied) with all features and again with
-   none, `cargo test` (unit, integration, and doc-tests), cargo-deny
+1. Rust: the toolchain pin check, rustfmt, clippy (pedantic, denied) with all
+   features and again with none, `cargo test` and the doc-tests, cargo-deny
    licenses, bans, and sources, and cargo-machete.
+   These tasks come from ctl-core's `tasks/rust.toml`, which `mise.toml`
+   includes at a ctl-core release tag; change them there, not here.
+   `check:features` and `verify` itself stay in `mise.dev.toml`, because
+   they name this crate's feature sets and its other checks.
+   Build, lint, and test run on the pinned stable (1.99.0, also
+   `rust-version` and `rust-toolchain.toml`); rustfmt runs on the dated
+   nightly. Bump the include's ref and both pins together.
    Tests run under plain `cargo test`. Measured on Linux and macOS with
    doc-tests included, cargo-nextest was 1.05 to 14 times slower (it starts
    one process per test), and mbx test scheduling or a `RUST_TEST_THREADS`
