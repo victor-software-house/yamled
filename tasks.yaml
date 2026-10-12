@@ -17,20 +17,18 @@ archive:
     title: Add yamled's own checks through check:repo
     scope: yamled
     outcome: yamled's verify is ctl-core's shared verify, and yamled's own checks run through check:repo, so a task added to the shared verify reaches yamled.
-    plan: https://github.com/victor-software-house/ctl-core/tree/6b7eaa7700078037aaffd6c5cb4025909746f54b/openspec/changes/repo-checks
     completed: 2026-10-11T23:15:00
     evidence:
-      - 'Merged in https://github.com/victor-software-house/yamled/pull/21 (377bbb3): verify on a fresh build runner without system node, in the pre-push hook, and in CI, Kody review clean.'
+      - 'Merged in https://github.com/victor-software-house/yamled/pull/21 (377bbb3): verify on a fresh build runner without system node, in the pre-push hook, and in CI, Kody review clean. Planned in ctl-core''s OpenSpec change repo-checks.'
     disposition: completed
 
   - id: YMD-006
     title: Run the shared Rust tasks on the pinned stable
     scope: yamled
     outcome: yamled builds, lints, and tests on Rust 1.99.0 through ctl-core's shared tasks, so a fix to a shared task reaches yamled by a ref bump.
-    plan: https://github.com/victor-software-house/ctl-core/tree/1f87bdbe2def7ea51af38c2a83e32281f74432ed/openspec/changes/shared-rust-tasks
     completed: 2026-10-11T22:48:38
     evidence:
-      - 'Released as yamled 0.0.6 (https://crates.io/crates/yamled/0.0.6) from https://github.com/victor-software-house/yamled/pull/19: verify on a fresh build runner, in the pre-push hook, and in CI, Kody review clean.'
+      - 'Released as yamled 0.0.6 (https://crates.io/crates/yamled/0.0.6) from https://github.com/victor-software-house/yamled/pull/19: verify on a fresh build runner, in the pre-push hook, and in CI, Kody review clean. Planned in ctl-core''s OpenSpec change shared-rust-tasks.'
     disposition: completed
 
   - id: YMD-005
