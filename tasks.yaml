@@ -6,10 +6,11 @@ queue:
   - id: YMD-008
     title: Take the shared Rust configuration from the Copier template
     scope: yamled
-    outcome: yamled renders its Rust configuration from the shared Copier template at a recorded tag, and CI fails when the template has a newer tag.
+    outcome: yamled renders its repository setup and Rust configuration from the shared Copier template at a recorded tag, and CI fails when the template has a newer tag.
     blocked_by: []
     acceptance:
-      - copier copy at v0.0.1 renders clippy.toml and deny.toml, records .copier-answers.yml, and leaves Cargo.toml to yamled.
+      - copier at v0.0.3 renders the mise profiles, lefthook.yml, and the Rust configuration files, records .copier-answers.yml, and leaves Cargo.toml and the rest of mise.toml to yamled.
+      - A fresh clone gets its git hooks from mise install, and a commit runs pre-commit and commit-msg; CI sets MISE_ENV=ci and installs no hooks.
       - taplo skips the files the template renders, and mise run verify passes.
       - The CI job Template mints a GitHub App token for the private template and runs copier check-update, and is skipped for pull requests from forks.
 archive:

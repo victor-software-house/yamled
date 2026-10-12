@@ -61,7 +61,7 @@ mise run verify
    licenses, bans, and sources, and cargo-machete.
    These tasks come from ctl-core's `tasks/rust.toml`, which `mise.toml`
    includes at a ctl-core release tag; change them there, not here.
-   `check:features` and `check:repo` stay in `mise.dev.toml`, because they
+   `check:features` and `check:repo` stay in `mise.toml`, because they
    name this crate's feature sets and its other checks; the shared
    `verify` depends on both.
    Build, lint, and test run on the pinned stable (1.99.0, also
@@ -78,8 +78,8 @@ mise run verify
 
 mise pins every tool, OpenSpec included (`npm:@fission-ai/openspec`, installed
 through Bun and run on the pinned Node); do not use a global copy.
-Advisories run on CI only (`mise run deny:advisories`). The `dev` env routes
-Cargo through mr-boxington (`mr_boxington = true` on the rust entry), locally
+Advisories run on CI only (`mise run deny:advisories`). The rust entry in
+`mise.toml` routes Cargo through mr-boxington (`mr_boxington = true`), locally
 and in CI, where `jdx/mr-boxington-action` restores the build cache.
 
 Tests put YAML in `indoc!` blocks. A unit test binds the expected text before
@@ -94,22 +94,34 @@ changed snapshot with `mise run snapshots`.
 generated ledgers with `proptest`, and
 [`tests/corpus.rs`](tests/corpus.rs) replaces every scalar of the public
 [YAML test suite][yaml-test-suite] with itself. The suite is a git submodule
-at `tests/yaml-test-suite`, pinned to a commit of its `data` branch: run
-`git submodule update --init` after cloning.
+at `tests/yaml-test-suite`, pinned to a commit of its `data` branch.
+`[deps.git-submodule]` in `mise.toml` checks it out before `mise run` or
+`mise x` when it is missing or `.gitmodules` changed.
 
 [yaml-test-suite]: https://github.com/yaml/yaml-test-suite
 
 ## Copier template
 
-`rust-toolchain.toml`, `rustfmt.toml`, `clippy.toml`, `deny.toml`, and the
-`[lints]` tables of `Cargo.toml` come from the shared Copier template, the
-private `victor-software-house/templates` repository (kind `rust-crate`).
+The repository setup comes from the shared Copier template, the private
+`victor-software-house/templates` repository (kind `rust-crate`): the whole
+files `.miserc.toml`, `.envrc`, `mise.dev.toml`, `mise.ci.toml`,
+`lefthook.yml`, `rust-toolchain.toml`, `rustfmt.toml`, `clippy.toml`, and
+`deny.toml`, plus the settings and toolchain block at the top of `mise.toml`
+and the `[lints]` tables of `Cargo.toml`.
 `.copier-answers.yml` records its tag and yamled's answers; never edit it by
 hand. Take a new tag with
 `MISE_ENV=template mise x -- uvx copier@9.18.2 update --defaults`, review
 the diff, and fix any conflict markers (`git diff --check`) before
-committing. The template owns the layout of those four whole files, so
-`.taplo.toml` excludes them.
+committing. The template owns the layout of its whole files, so
+`.taplo.toml` excludes the TOML ones.
+
+Local work loads the `dev` profile (`.miserc.toml`): lefthook, committed,
+gitleaks, and the hook tasks. Its `postinstall` hook runs `lefthook install`
+after every `mise install`, so a fresh clone gets its git hooks from
+`mise install`. CI sets `MISE_ENV=ci` (`ci,release` for release jobs) and never
+loads `dev`, so no runner installs hooks. The Version PR job installs only
+rust, mr-boxington, and verctl, because verctl's `prepare.after` runs
+`cargo update --workspace`.
 
 The CI job `Template` runs `mise run check:template` (`copier
 check-update`), which fails when a newer tag exists. It reads the private

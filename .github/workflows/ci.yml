@@ -12,8 +12,7 @@ env:
   GIT_CONFIG_COUNT: "1"
   GIT_CONFIG_KEY_0: init.defaultBranch
   GIT_CONFIG_VALUE_0: main
-  CARGO_TERM_COLOR: always
-  MISE_ENV: dev,ci
+  MISE_ENV: ci
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.head_ref || github.ref_name }}-${{ github.event.pull_request.base.sha || github.sha }}
@@ -64,11 +63,14 @@ jobs:
           private-key: ${{ secrets.TEMPLATES_APP_PRIVATE_KEY }}
           repositories: templates
           permission-contents: read
-      - name: Install locked toolchain
+      - name: Install copier's interpreter
         uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
           version: 2026.10.3
           cache: true
+          # check:template needs only uv and python; the toolchain in
+          # mise.toml is for Verify.
+          install_args: uv python
       - name: Template version
         env:
           # Only this step clones the template, so it alone carries the token.
