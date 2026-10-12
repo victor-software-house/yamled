@@ -1,19 +1,28 @@
 # yaml-language-server: $schema=https://github.com/victor-software-house/qctl/releases/download/v0.4.4/tasks.schema.json
 schema_version: 4
 prefix: YMD
-active: YMD-007
+active: YMD-008
 queue:
+  - id: YMD-008
+    title: Take the shared Rust configuration from the Copier template
+    scope: yamled
+    outcome: yamled renders its Rust configuration from the shared Copier template at a recorded tag, and CI fails when the template has a newer tag.
+    blocked_by: []
+    acceptance:
+      - copier copy at v0.0.1 renders clippy.toml and deny.toml, records .copier-answers.yml, and leaves Cargo.toml to yamled.
+      - taplo skips the files the template renders, and mise run verify passes.
+      - The CI job Template mints a GitHub App token for the private template and runs copier check-update, and is skipped for pull requests from forks.
+archive:
   - id: YMD-007
     title: Add yamled's own checks through check:repo
     scope: yamled
     outcome: yamled's verify is ctl-core's shared verify, and yamled's own checks run through check:repo, so a task added to the shared verify reaches yamled.
-    blocked_by: []
-    acceptance:
-      - mise.toml includes ctl-core's tasks/rust.toml at v0.6.14, and mise.dev.toml defines check:repo instead of overriding verify.
-      - node is pinned in mise.dev.toml, so specs runs where no system node exists.
-      - mise run verify passes on a fresh machine without system node, and in CI.
     plan: https://github.com/victor-software-house/ctl-core/tree/6b7eaa7700078037aaffd6c5cb4025909746f54b/openspec/changes/repo-checks
-archive:
+    completed: 2026-10-11T23:15:00
+    evidence:
+      - 'Merged in https://github.com/victor-software-house/yamled/pull/21 (377bbb3): verify on a fresh build runner without system node, in the pre-push hook, and in CI, Kody review clean.'
+    disposition: completed
+
   - id: YMD-006
     title: Run the shared Rust tasks on the pinned stable
     scope: yamled

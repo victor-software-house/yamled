@@ -99,6 +99,23 @@ at `tests/yaml-test-suite`, pinned to a commit of its `data` branch: run
 
 [yaml-test-suite]: https://github.com/yaml/yaml-test-suite
 
+## Copier template
+
+`rust-toolchain.toml`, `rustfmt.toml`, `clippy.toml`, `deny.toml`, and the
+`[lints]` tables of `Cargo.toml` come from the shared Copier template, the
+private `victor-software-house/templates` repository (kind `rust-crate`).
+`.copier-answers.yml` records its tag and yamled's answers; never edit it by
+hand. Take a new tag with
+`MISE_ENV=template mise x -- uvx copier@9.18.2 update --defaults`, review
+the diff, and fix any conflict markers (`git diff --check`) before
+committing. The template owns the layout of those four whole files, so
+`.taplo.toml` excludes them.
+
+The CI job `Template` runs `mise run check:template` (`copier
+check-update`), which fails when a newer tag exists. It reads the private
+repository with a token from the `vsh-templates-reader` GitHub App, and it is
+skipped for pull requests from forks.
+
 ## Features
 
 `serde` (default) adds the edits that write a value (`replace`, `insert`,

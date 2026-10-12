@@ -42,3 +42,36 @@ jobs:
         run: mise run deny:advisories
       - name: Package
         run: mise x -- cargo package --locked --all-features
+
+  template:
+    name: Template
+    # A pull request from a fork gets no secrets and cannot read the private
+    # template, so the check is skipped there instead of failing.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      MISE_ENV: template
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Mint a token that reads the template
+        id: app
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.TEMPLATES_APP_CLIENT_ID }}
+          private-key: ${{ secrets.TEMPLATES_APP_PRIVATE_KEY }}
+          repositories: templates
+          permission-contents: read
+      - name: Install locked toolchain
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.10.3
+          cache: true
+      - name: Template version
+        env:
+          GIT_CONFIG_COUNT: "2"
+          GIT_CONFIG_KEY_1: url.https://x-access-token:${{ steps.app.outputs.token }}@github.com/victor-software-house/templates.insteadOf
+          GIT_CONFIG_VALUE_1: https://github.com/victor-software-house/templates
+        run: mise run check:template
