@@ -1,19 +1,29 @@
 # yaml-language-server: $schema=https://github.com/victor-software-house/qctl/releases/download/v0.4.4/tasks.schema.json
 schema_version: 4
 prefix: YMD
-active: YMD-006
+active: YMD-007
 queue:
+  - id: YMD-007
+    title: Add yamled's own checks through check:repo
+    scope: yamled
+    outcome: yamled's verify is ctl-core's shared verify, and yamled's own checks run through check:repo, so a task added to the shared verify reaches yamled.
+    blocked_by: []
+    acceptance:
+      - mise.toml includes ctl-core's tasks/rust.toml at v0.6.14, and mise.dev.toml defines check:repo instead of overriding verify.
+      - node is pinned in mise.dev.toml, so specs runs where no system node exists.
+      - mise run verify passes on a fresh machine without system node, and in CI.
+    plan: https://github.com/victor-software-house/ctl-core/tree/6b7eaa7700078037aaffd6c5cb4025909746f54b/openspec/changes/repo-checks
+archive:
   - id: YMD-006
     title: Run the shared Rust tasks on the pinned stable
     scope: yamled
     outcome: yamled builds, lints, and tests on Rust 1.99.0 through ctl-core's shared tasks, so a fix to a shared task reaches yamled by a ref bump.
-    blocked_by: []
-    acceptance:
-      - mise.toml includes ctl-core's tasks/rust.toml at v0.6.13, and mise.dev.toml keeps only yamled's own tasks.
-      - rust-toolchain.toml, rust-version, and the mise rust entry pin 1.99.0; rustfmt runs on nightly-2026-09-29.
-      - mise run verify passes on a fresh machine and in CI.
     plan: https://github.com/victor-software-house/ctl-core/tree/1f87bdbe2def7ea51af38c2a83e32281f74432ed/openspec/changes/shared-rust-tasks
-archive:
+    completed: 2026-10-11T22:48:38
+    evidence:
+      - 'Released as yamled 0.0.6 (https://crates.io/crates/yamled/0.0.6) from https://github.com/victor-software-house/yamled/pull/19: verify on a fresh build runner, in the pre-push hook, and in CI, Kody review clean.'
+    disposition: completed
+
   - id: YMD-005
     title: Name the tag that refuses a replace
     scope: yamled

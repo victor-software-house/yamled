@@ -9,5 +9,5 @@ includes = [
   "git::https://github.com/victor-software-house/qctl.git//tasks/q?ref=v0.4.4",
   # The standard Rust tasks, shared from ctl-core. Bump the ref together with
   # the rust pins in mise.dev.toml.
-  "git::https://github.com/victor-software-house/ctl-core.git//tasks/rust.toml?ref=v0.6.13",
+  "git::https://github.com/victor-software-house/ctl-core.git//tasks/rust.toml?ref=v0.6.14",
 ]

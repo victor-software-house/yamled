@@ -61,8 +61,9 @@ mise run verify
    licenses, bans, and sources, and cargo-machete.
    These tasks come from ctl-core's `tasks/rust.toml`, which `mise.toml`
    includes at a ctl-core release tag; change them there, not here.
-   `check:features` and `verify` itself stay in `mise.dev.toml`, because
-   they name this crate's feature sets and its other checks.
+   `check:features` and `check:repo` stay in `mise.dev.toml`, because they
+   name this crate's feature sets and its other checks; the shared
+   `verify` depends on both.
    Build, lint, and test run on the pinned stable (1.99.0, also
    `rust-version` and `rust-toolchain.toml`); rustfmt runs on the dated
    nightly. Bump the include's ref and both pins together.
@@ -71,15 +72,15 @@ mise run verify
    one process per test), and mbx test scheduling or a `RUST_TEST_THREADS`
    cap slowed concurrent runs. Do not reintroduce them without new
    measurements.
-2. Everything else: taplo for TOML (`.taplo.toml`), rumdl for Markdown
+2. `check:repo`: taplo for TOML (`.taplo.toml`), rumdl for Markdown
    (`.rumdl.toml`), typos for spelling, actionlint for workflows, and
    `openspec validate --all --strict`.
 
 mise pins every tool, OpenSpec included (`npm:@fission-ai/openspec`, installed
-through Bun); do not use a global copy. Advisories run on CI only
-(`mise run deny:advisories`). The `dev` env routes Cargo through mr-boxington
-(`mr_boxington = true` on the rust entry), locally and in CI, where
-`jdx/mr-boxington-action` restores the build cache.
+through Bun and run on the pinned Node); do not use a global copy.
+Advisories run on CI only (`mise run deny:advisories`). The `dev` env routes
+Cargo through mr-boxington (`mr_boxington = true` on the rust entry), locally
+and in CI, where `jdx/mr-boxington-action` restores the build cache.
 
 Tests put YAML in `indoc!` blocks. A unit test binds the expected text before
 the assertion (`let expected = indoc! {...}; assert_eq!(document.as_str(),
