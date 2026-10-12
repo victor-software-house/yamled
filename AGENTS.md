@@ -123,10 +123,11 @@ loads `dev`, so no runner installs hooks. The Version PR job installs only
 rust, mr-boxington, and verctl, because verctl's `prepare.after` runs
 `cargo update --workspace`.
 
-The CI job `Template` runs `mise run check:template` (`copier
-check-update`), which fails when a newer tag exists. It reads the private
-repository with a token from the `vsh-templates-reader` GitHub App, and it is
-skipped for pull requests from forks.
+The CI job `Template` uses ctl-core's composite action
+`.github/actions/copier-check`, pinned by commit. It mints a token from the
+`vsh-templates-reader` GitHub App, installs only uv and python, and runs
+`mise run check:template` (`copier check-update`), which fails when a newer
+tag exists. The job is skipped for pull requests from forks.
 
 ## Features
 

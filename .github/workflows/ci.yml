@@ -48,36 +48,15 @@ jobs:
     # template, so the check is skipped there instead of failing.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    env:
-      MISE_ENV: template
-      # Without this, mise run installs every missing tool in mise.toml, the
-      # whole toolchain, before check:template.
-      MISE_TASK_RUN_AUTO_INSTALL: "false"
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Mint a token that reads the template
-        id: app
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+      # Mints a token from the vsh-templates-reader App, installs only uv and
+      # python, and runs mise.template.toml's check:template.
+      - name: Check the template version
+        uses: victor-software-house/ctl-core/.github/actions/copier-check@91a70d41e107ced0968e7d2301e4a01320cc0cbd # main, 2026-10-12
         with:
           client-id: ${{ secrets.TEMPLATES_APP_CLIENT_ID }}
           private-key: ${{ secrets.TEMPLATES_APP_PRIVATE_KEY }}
-          repositories: templates
-          permission-contents: read
-      - name: Install copier's interpreter
-        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
-        with:
-          version: 2026.10.3
-          cache: true
-          # check:template needs only uv and python; the toolchain in
-          # mise.toml is for Verify.
-          install_args: uv python
-      - name: Template version
-        env:
-          # Only this step clones the template, so it alone carries the token.
-          GIT_CONFIG_COUNT: "1"
-          GIT_CONFIG_KEY_0: url.https://x-access-token:${{ steps.app.outputs.token }}@github.com/victor-software-house/templates.insteadOf
-          GIT_CONFIG_VALUE_0: https://github.com/victor-software-house/templates
-        run: mise run check:template
