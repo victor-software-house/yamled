@@ -124,9 +124,12 @@ catalogs. Every other task is a one-line fragment or a file task in
 carries its prefix (`lint:md` in `lint.toml`).
 
 Local work loads the `dev` profile (`.miserc.toml`): lefthook, committed, and
-gitleaks. Every hook command runs with `MISE_ENV=dev,hooks`. Its
-`postinstall` hook runs `lefthook install` after every `mise install`, so a
-fresh clone gets its git hooks from `mise install`. CI sets `MISE_ENV=ci`
+gitleaks. Every hook command runs with `MISE_ENV=dev,hooks`, and
+`mise.hooks.toml` disables the submodule checkout there, because git sets
+`GIT_INDEX_FILE` inside pre-commit and commit-msg. The first `mise run` or
+`mise x` checks it out, so run one before the first push from a fresh clone.
+Its `postinstall` hook runs `lefthook install` after every `mise install`, so
+a fresh clone gets its git hooks from `mise install`. CI sets `MISE_ENV=ci`
 (`ci,release` for release jobs) and never loads `dev`, so no runner installs
 hooks. The Version PR job installs only rust, mr-boxington, and verctl,
 because verctl's `prepare.after` runs `cargo update --workspace`.
