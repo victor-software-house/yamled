@@ -35,52 +35,19 @@ typos = "1.50.3"
 actionlint = "1.7.12"
 "npm:@fission-ai/openspec" = "1.13.2"
 
+# mise-tasks/ holds this repository's task fragments and file tasks. An
+# includes list replaces the default task dirs, so mise-tasks comes first; add
+# pinned git:: catalogs after it.
 [task_config]
 includes = [
+  "mise-tasks",
   "git::https://github.com/victor-software-house/qctl.git//tasks/q?ref=v0.4.4",
-  # The standard Rust tasks, shared from ctl-core. Bump the ref together with
-  # the rust pins above.
-  "git::https://github.com/victor-software-house/ctl-core.git//tasks/rust.toml?ref=v0.6.14",
+  # The standard Rust tasks, verify included, shared from ctl-core. Bump the
+  # ref together with the rust pins above.
+  "git::https://github.com/victor-software-house/ctl-core.git//tasks/rust.toml?ref=v0.6.15",
 ]
 
 # The YAML test suite submodule: `mise run` and `mise x` check it out when
 # .gitmodules changes or the directory is missing.
 [deps.git-submodule]
 auto = true
-
-# check:toolchain, format, lint, test, test:doc, deny, deny:advisories, deps,
-# and semver come from ctl-core's tasks/rust.toml.
-
-[tasks."check:features"]
-description = "Lint the crate and its tests without the serde feature"
-run = "cargo clippy --no-default-features --all-targets -- -D warnings"
-
-[tasks.snapshots]
-description = "Review and accept changed snapshots"
-tools = { "github:mitsuhiko/insta" = { version = "1.48.0", exe = "cargo-insta" } }
-run = "cargo insta review"
-
-[tasks."format:toml"]
-description = "TOML formatting check"
-run = "taplo fmt --check"
-
-[tasks."lint:md"]
-description = "Markdown lint"
-run = "rumdl check ."
-
-[tasks."lint:typos"]
-description = "Spelling in code, docs, and commit-bound text"
-run = "typos"
-
-[tasks."lint:workflows"]
-description = "GitHub Actions workflow lint"
-run = "actionlint"
-
-[tasks.specs]
-description = "Validate every OpenSpec change and spec"
-run = "openspec validate --all --strict"
-
-# The shared verify depends on check:repo for this repository's own checks.
-[tasks."check:repo"]
-description = "TOML format, Markdown, spelling, workflows, OpenSpec"
-depends = ["format:toml", "lint:md", "lint:typos", "lint:workflows", "specs"]

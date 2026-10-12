@@ -1,5 +1,6 @@
 # Loaded when MISE_ENV contains `dev` (local default via .miserc.toml). CI never
-# loads it, so local-only tools, the git hooks, and their tasks live here.
+# loads it, so local-only tools and the git hooks live here. Their tasks are in
+# mise-tasks/.
 
 [tools]
 lefthook = "2.2.1"
@@ -10,21 +11,3 @@ gitleaks = "8.30.1"
 # already present. CI never loads this file, so runners never get the hooks.
 [hooks]
 postinstall = "lefthook install"
-
-[tasks."hooks:secrets:staged"]
-description = "Scan the staged diff for credentials"
-run = "gitleaks git --staged --redact --no-banner"
-
-[tasks."hooks:secrets:history"]
-description = "Scan the full history for credentials"
-run = "gitleaks git --redact --no-banner"
-
-[tasks.commit-msg]
-description = "Lint the git commit-msg file with committed"
-usage = 'arg "<file>" help="Path to the commit message file"'
-run = 'committed --commit-file "${usage_file}"'
-
-[tasks.commits]
-description = "Lint the commit messages in a range with committed"
-usage = 'arg "[commits]" default="HEAD" help="Commit or range"'
-run = 'committed "${usage_commits}"'
