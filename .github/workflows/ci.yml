@@ -71,7 +71,8 @@ jobs:
           cache: true
       - name: Template version
         env:
-          GIT_CONFIG_COUNT: "2"
-          GIT_CONFIG_KEY_1: url.https://x-access-token:${{ steps.app.outputs.token }}@github.com/victor-software-house/templates.insteadOf
-          GIT_CONFIG_VALUE_1: https://github.com/victor-software-house/templates
+          # Only this step clones the template, so it alone carries the token.
+          GIT_CONFIG_COUNT: "1"
+          GIT_CONFIG_KEY_0: url.https://x-access-token:${{ steps.app.outputs.token }}@github.com/victor-software-house/templates.insteadOf
+          GIT_CONFIG_VALUE_0: https://github.com/victor-software-house/templates
         run: mise run check:template
