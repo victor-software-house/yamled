@@ -134,8 +134,9 @@ because verctl's `prepare.after` runs `cargo update --workspace`.
 The CI job `Template` uses ctl-core's composite action
 `.github/actions/copier-check`, pinned by commit. It mints a token from the
 `vsh-templates-reader` GitHub App, installs only uv and python, and runs
-`mise run check:template` (`copier check-update`), which fails when a newer
-tag exists. The job is skipped for pull requests from forks.
+`copier update`. It fails when the newest tag changes a file besides
+`.copier-answers.yml`; a newer tag that renders the same files passes with a
+notice. The job is skipped for pull requests from forks.
 
 ## Features
 
