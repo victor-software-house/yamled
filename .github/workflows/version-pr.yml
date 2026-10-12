@@ -46,6 +46,7 @@ jobs:
           repositories: ${{ github.event.repository.name }}
           permission-contents: write
           permission-pull-requests: write
-      - uses: victor-software-house/verctl/actions/version-pr@c9f41e8df9746ad240cf59bc18626c0d938c7662 # v0.2.3
+      - uses: victor-software-house/verctl/actions/version-pr@48879ded931b14024591fdee308ccee83484f94f # v0.3.13
         with:
           token: ${{ steps.app-token.outputs.token }}
+          auto-merge: "true"
