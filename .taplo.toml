@@ -10,4 +10,6 @@ exclude = [
   "mise.dev.toml",
   "mise.ci.toml",
   ".miserc.toml",
+  "committed.toml",
+  "mise-tasks/hooks.toml",
 ]

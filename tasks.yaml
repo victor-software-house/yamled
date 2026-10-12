@@ -1,19 +1,27 @@
 # yaml-language-server: $schema=https://github.com/victor-software-house/qctl/releases/download/v0.4.4/tasks.schema.json
 schema_version: 4
 prefix: YMD
-active: YMD-008
+active: YMD-009
 queue:
+  - id: YMD-009
+    title: Take template v0.0.4 and its task layout
+    scope: yamled
+    outcome: yamled is on template v0.0.4, keeps its own tasks as fragments in mise-tasks/, and runs every hook with MISE_ENV=dev,hooks.
+    blocked_by: []
+    acceptance:
+      - copier update to v0.0.4 leaves no conflict marker, and committed.toml and the mise-tasks files come from the template.
+      - mise.toml holds tools, settings, and deps; includes lists mise-tasks first; yamled's tasks are fragments in mise-tasks/.
+      - A commit runs pre-commit and commit-msg, and mise run verify passes.
+archive:
   - id: YMD-008
     title: Take the shared Rust configuration from the Copier template
     scope: yamled
     outcome: yamled renders its repository setup and Rust configuration from the shared Copier template at a recorded tag, and CI fails when the template has a newer tag.
-    blocked_by: []
-    acceptance:
-      - copier at v0.0.3 renders the mise profiles, lefthook.yml, and the Rust configuration files, records .copier-answers.yml, and leaves Cargo.toml and the rest of mise.toml to yamled.
-      - A fresh clone gets its git hooks from mise install, and a commit runs pre-commit and commit-msg; CI sets MISE_ENV=ci and installs no hooks.
-      - taplo skips the files the template renders, and mise run verify passes.
-      - The CI job Template mints a GitHub App token for the private template and runs copier check-update, and is skipped for pull requests from forks.
-archive:
+    completed: 2026-10-12T01:20:00
+    evidence:
+      - 'Merged in https://github.com/victor-software-house/yamled/pull/22 (a10bae3) at template v0.0.3: on a fresh build runner mise install armed the hooks, a commit ran pre-commit and commit-msg, MISE_ENV=ci installed no hooks, and verify passed; CI Verify and Template passed, Template through ctl-core''s composite action.'
+    disposition: completed
+
   - id: YMD-007
     title: Add yamled's own checks through check:repo
     scope: yamled

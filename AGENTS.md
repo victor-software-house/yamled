@@ -61,9 +61,9 @@ mise run verify
    licenses, bans, and sources, and cargo-machete.
    These tasks come from ctl-core's `tasks/rust.toml`, which `mise.toml`
    includes at a ctl-core release tag; change them there, not here.
-   `check:features` and `check:repo` stay in `mise.toml`, because they
-   name this crate's feature sets and its other checks; the shared
-   `verify` depends on both.
+   `check:features` and `check:repo` live in `mise-tasks/check.toml`,
+   because they name this crate's feature sets and its other checks; the
+   shared `verify` depends on both.
    Build, lint, and test run on the pinned stable (1.99.0, also
    `rust-version` and `rust-toolchain.toml`); rustfmt runs on the dated
    nightly. Bump the include's ref and both pins together.
@@ -105,9 +105,11 @@ at `tests/yaml-test-suite`, pinned to a commit of its `data` branch.
 The repository setup comes from the shared Copier template, the private
 `victor-software-house/templates` repository (kind `rust-crate`): the whole
 files `.miserc.toml`, `.envrc`, `mise.dev.toml`, `mise.ci.toml`,
-`lefthook.yml`, `rust-toolchain.toml`, `rustfmt.toml`, `clippy.toml`, and
-`deny.toml`, plus the settings and toolchain block at the top of `mise.toml`
-and the `[lints]` tables of `Cargo.toml`.
+`lefthook.yml`, `committed.toml`, `mise-tasks/hooks.toml`,
+`mise-tasks/commit-msg`, `mise-tasks/commits`, `rust-toolchain.toml`,
+`rustfmt.toml`, `clippy.toml`, and `deny.toml`, plus the settings,
+toolchain, and `[task_config]` blocks of `mise.toml` and the `[lints]` tables
+of `Cargo.toml`.
 `.copier-answers.yml` records its tag and yamled's answers; never edit it by
 hand. Take a new tag with
 `MISE_ENV=template mise x -- uvx copier@9.18.2 update --defaults`, review
@@ -115,13 +117,19 @@ the diff, and fix any conflict markers (`git diff --check`) before
 committing. The template owns the layout of its whole files, so
 `.taplo.toml` excludes the TOML ones.
 
-Local work loads the `dev` profile (`.miserc.toml`): lefthook, committed,
-gitleaks, and the hook tasks. Its `postinstall` hook runs `lefthook install`
-after every `mise install`, so a fresh clone gets its git hooks from
-`mise install`. CI sets `MISE_ENV=ci` (`ci,release` for release jobs) and never
-loads `dev`, so no runner installs hooks. The Version PR job installs only
-rust, mr-boxington, and verctl, because verctl's `prepare.after` runs
-`cargo update --workspace`.
+Tasks follow one layout. `mise.toml` holds tools, settings, and deps, and
+its `[task_config].includes` lists `mise-tasks` first, then the pinned `git::`
+catalogs. Every other task is a one-line fragment or a file task in
+`mise-tasks/`. Fragment names are not namespaced by file, so each name
+carries its prefix (`lint:md` in `lint.toml`).
+
+Local work loads the `dev` profile (`.miserc.toml`): lefthook, committed, and
+gitleaks. Every hook command runs with `MISE_ENV=dev,hooks`. Its
+`postinstall` hook runs `lefthook install` after every `mise install`, so a
+fresh clone gets its git hooks from `mise install`. CI sets `MISE_ENV=ci`
+(`ci,release` for release jobs) and never loads `dev`, so no runner installs
+hooks. The Version PR job installs only rust, mr-boxington, and verctl,
+because verctl's `prepare.after` runs `cargo update --workspace`.
 
 The CI job `Template` uses ctl-core's composite action
 `.github/actions/copier-check`, pinned by commit. It mints a token from the

@@ -1,0 +1,1 @@
+specs = { description = "Validate every OpenSpec change and spec", run = "openspec validate --all --strict" }
