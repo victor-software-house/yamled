@@ -1,18 +1,27 @@
 # yaml-language-server: $schema=https://github.com/victor-software-house/qctl/releases/download/v0.4.4/tasks.schema.json
 schema_version: 4
 prefix: YMD
-active: YMD-009
+active: YMD-010
 queue:
+  - id: YMD-010
+    title: Take template v0.0.5 and lock only the platforms in use
+    scope: yamled
+    outcome: mise install on linux-x64 or macos-arm64 leaves every lock unchanged, because mise.toml declares lockfile_platforms and every lock records exactly those two platforms.
+    blocked_by: []
+    acceptance:
+      - copier update to v0.0.5 leaves no conflict marker, and mise.toml sets lockfile_platforms = ["linux-x64", "macos-arm64"].
+      - Every lock is regenerated whole with mise lock --platform linux-x64,macos-arm64, and its linux-x64 and macos-arm64 entries match main.
+      - On a fresh linux-x64 machine, mise install leaves git status clean, and mise run verify passes.
+archive:
   - id: YMD-009
     title: Take template v0.0.4 and its task layout
     scope: yamled
     outcome: yamled is on template v0.0.4, keeps its own tasks as fragments in mise-tasks/, and runs every hook with MISE_ENV=dev,hooks.
-    blocked_by: []
-    acceptance:
-      - copier update to v0.0.4 leaves no conflict marker, and committed.toml and the mise-tasks files come from the template.
-      - mise.toml holds tools, settings, and deps; includes lists mise-tasks first; yamled's tasks are fragments in mise-tasks/.
-      - A commit runs pre-commit and commit-msg, and mise run verify passes.
-archive:
+    completed: 2026-10-12T02:10:00
+    evidence:
+      - 'Merged in https://github.com/victor-software-house/yamled/pull/23 (06bf38b) at template v0.0.4: on a fresh clone mise install --locked passed, a commit ran pre-commit and commit-msg, mise run verify and pre-push passed; CI Verify and Template passed. A hooks overlay that disabled the submodule checkout was added and reverted there, because it also stopped pre-push from syncing the submodule.'
+    disposition: completed
+
   - id: YMD-008
     title: Take the shared Rust configuration from the Copier template
     scope: yamled
