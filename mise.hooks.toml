@@ -1,5 +1,0 @@
-# Loaded by every git hook (lefthook sets MISE_ENV=dev,hooks). Inside
-# pre-commit and commit-msg, git sets GIT_INDEX_FILE, so the submodule
-# checkout stays out of hooks; the first `mise run` or `mise x` does it.
-[deps]
-disable = ["git-submodule"]
