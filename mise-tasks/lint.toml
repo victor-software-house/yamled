@@ -1,3 +1,0 @@
-"lint:md" = { description = "Markdown lint", run = "rumdl check ." }
-"lint:typos" = { description = "Spelling in code, docs, and commit-bound text", run = "typos" }
-"lint:workflows" = { description = "GitHub Actions workflow lint", run = "actionlint" }

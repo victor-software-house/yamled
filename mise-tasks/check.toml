@@ -1,9 +1,2 @@
 # The shared verify from ctl-core depends on both by name.
 "check:features" = { description = "Lint the crate and its tests without the serde feature", run = "cargo clippy --no-default-features --all-targets -- -D warnings" }
-"check:repo" = { description = "TOML format, Markdown, spelling, workflows, OpenSpec", depends = [
-  "format:toml",
-  "lint:md",
-  "lint:typos",
-  "lint:workflows",
-  "specs",
-] }
