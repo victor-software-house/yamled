@@ -1,1 +1,0 @@
-"format:toml" = { description = "TOML formatting check", run = "taplo fmt --check" }
