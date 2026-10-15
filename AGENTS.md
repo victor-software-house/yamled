@@ -14,7 +14,10 @@ This repo's queue is [`tasks.yaml`](tasks.yaml) (`YMD-###`).
   its own comments, insert a key or item at the file's indentation, and move a
   byte range.
 - A value writer that follows the file's style, so a caller never decides
-  quoting or indentation by hand.
+  quoting or indentation by hand. Two settings compose: `TextStyle` picks the
+  layout of one write (block or one line), and the document's `Quotes`,
+  set once with `Document::with_quotes`, picks the quotes every writer uses.
+  `Auto` in both means yamled chooses.
 
 Parsing is `granit-parser`; values are read and written through
 `serde-saphyr`. Domain rules stay in the caller: which row moves where, what a

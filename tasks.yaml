@@ -14,20 +14,23 @@ queue:
       - On a fresh linux-x64 machine, mise install leaves git status clean, and mise run verify passes.
 
   - id: YMD-011
-    title: Write quoted text without a doubled quote, and on one line on request
+    title: Let a document choose its quotes, and write one line on request
     scope: yamled writer
-    outcome: TextStyle::Auto never writes a doubled single quote for text that holds an apostrophe and no double quote, and TextStyle::Line writes any string on one line whatever the node's current style.
+    outcome: A document's Quotes setting picks the quotes every writer uses, Quotes::Auto follows a documented order that never doubles a quote for an apostrophe, and TextStyle chooses layout only, with Line writing any string on one line.
     blocked_by: []
     acceptance:
-      - Text with an apostrophe and no double quote, written with TextStyle::Auto and needing quotes, reads as a double-quoted scalar, with no doubled single quote.
-      - Text that holds both an apostrophe and a double quote is still written single-quoted, so no backslash escape is added.
-      - A scalar already written single-quoted keeps its style on replace.
       - replace_text with TextStyle::Line turns a folded or literal item into one line that reads back as the same string.
+      - Document::with_quotes sets Auto, Single, or Double, and replace, insert, push, the text forms, and flow sequence items all follow it.
+      - Under Quotes::Auto, text needing quotes is single-quoted without an apostrophe, double-quoted with an apostrophe and no double quote, and otherwise takes the form with fewer escapes, ties to single.
+      - Every preference writes plain text that reads back, and double quotes for a character only they can carry.
+      - A scalar already quoted keeps its quotes on replace with TextStyle::Auto.
     notes:
       - >2-
         2026-10-15, qctl QCTL-039 needs it: qctl writes every list item through TextStyle::Auto, and render::text tries plain, then single-quoted, then double-quoted, so a note such as "it's: here" becomes 'it''s: here'. flow_safe already prefers double quotes for an apostrophe.
       - >2-
         2026-10-15, TextStyle::Line added for the same qctl row: qctl fmt rewrites block list items in place, and replace_text with Auto keeps the node's block style, while a remove and insert would drop the item's comments.
+      - >2-
+        2026-10-15, reworked on review: the apostrophe rule was hardcoded inside TextStyle::Auto and again in flow_safe. Quoting is now a per-document Quotes setting with an explicit order, and TextStyle is layout only.
 archive:
   - id: YMD-009
     title: Take template v0.0.4 and its task layout

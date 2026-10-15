@@ -1,5 +1,65 @@
 # Spec Delta
 
+## ADDED Requirements
+
+### Requirement: A document declares its quotes
+
+A document SHALL carry one quote preference, `Quotes`, set with
+`Document::with_quotes` and `Quotes::Auto` by default, and every writer,
+flow sequence items included, SHALL follow it. Each preference SHALL write a
+string plain when it reads back unquoted; otherwise `Single` SHALL write
+single quotes and `Double` double quotes. A character only double quotes can
+carry, such as a control character, SHALL get double quotes.
+
+#### Scenario: Plain text stays plain
+
+- **WHEN** the caller pushes `plain text` in one-line style
+- **THEN** the item reads `- plain text` under every preference
+
+#### Scenario: A control character is double-quoted
+
+- **WHEN** the caller pushes `a`, the character U+0001, and `: b` in one-line
+  style under `Quotes::Single`
+- **THEN** the item reads `- "a\u0001: b"`
+
+#### Scenario: Single and double preferences
+
+- **WHEN** the caller pushes `it's: here` under `Quotes::Single`
+- **THEN** the item reads `- 'it''s: here'`
+- **AND** `a: b` under `Quotes::Double` reads `- "a: b"`
+
+#### Scenario: A flow item follows the document's quotes
+
+- **WHEN** a row has `tags: [a]`
+- **AND** the caller replaces `tags` with `["it's, flow", "a, b"]` under
+  `Quotes::Auto`
+- **THEN** the line reads `tags: ["it's, flow", 'a, b']`
+
+### Requirement: Automatic quotes follow a fixed order
+
+`Quotes::Auto` SHALL quote a string that cannot be plain with the first that
+applies: single quotes when the text holds no `'`; double quotes when it holds
+`'` and no `"`; holding both, the form with fewer escapes, a tie going to
+single quotes.
+
+#### Scenario: Text without an apostrophe is single-quoted
+
+- **WHEN** the caller pushes `a: b` in one-line style under `Quotes::Auto`
+- **THEN** the item reads `- 'a: b'`
+
+#### Scenario: An apostrophe without a double quote is double-quoted
+
+- **WHEN** the caller pushes `it's: C:\dir` in one-line style under
+  `Quotes::Auto`
+- **THEN** the item reads `- "it's: C:\\dir"`
+
+#### Scenario: Both quote characters take the form with fewer escapes
+
+- **WHEN** the caller pushes `it's "x": y` in one-line style under
+  `Quotes::Auto`
+- **THEN** the item reads `- 'it''s "x": y'`, one escape against two
+- **AND** `it's 'odd': "x"` reads `- "it's 'odd': \"x\""`, two against three
+
 ## MODIFIED Requirements
 
 ### Requirement: Replace a value
@@ -7,10 +67,8 @@
 `Document::replace` SHALL write a serializable value in place of the node at a
 path. A replaced scalar SHALL keep its style when that style can represent the
 new value: plain stays plain, single- and double-quoted stay quoted, folded and
-literal stay block scalars. Otherwise the writer SHALL choose plain, then
-single-quoted, then double-quoted, in that order, taking the first that reads
-back as the same value. Single quotes SHALL be skipped in that order when the
-text holds an apostrophe and no double quote.
+literal stay block scalars. Otherwise the writer SHALL write it plain or quoted
+as "A document declares its quotes" says.
 
 #### Scenario: A plain title that now needs quoting is quoted once
 
@@ -40,32 +98,21 @@ text holds an apostrophe and no double quote.
 ### Requirement: Write text in a chosen block style
 
 `Document::replace_text`, `Document::insert_text`, and `Document::push_text`
-SHALL write a string in a caller-chosen style: automatic, folded (`>-`),
-literal (`|-`), or one line. Automatic style SHALL follow the quoting order of
-"Replace a value", so text with an apostrophe and no double quote is never
-written with a doubled single quote. One-line style SHALL follow the same order
-without a block scalar and without the node's current style, so a block scalar
-it replaces becomes one line, and text with a line break is double-quoted with
-`\n` escapes. An indentation indicator SHALL be written only when the text
-starts with a space.
+SHALL write a string in a caller-chosen layout, `TextStyle`: automatic, folded
+(`>-`), literal (`|-`), or one line. `TextStyle` SHALL choose layout only; the
+quotes of a one-line string SHALL come from the document's `Quotes`.
+Automatic layout SHALL keep the node's current style when it can hold the
+text, then try a literal block for text with a line break, then one line.
+One-line layout SHALL ignore the node's current style and never write a block
+scalar, so a block scalar it replaces becomes one line, and text with a line
+break is double-quoted with `\n` escapes. An indentation indicator SHALL be
+written only when the text starts with a space.
 
 #### Scenario: A dated note is folded without an indentation indicator
 
 - **WHEN** the caller pushes the text `2026-09-28: a dated note` with folded
   style
 - **THEN** the item reads `- >-` followed by the text on the next line
-
-#### Scenario: An apostrophe is written inside double quotes
-
-- **WHEN** the caller pushes the text `2026-10-15: it's here` with automatic
-  style
-- **THEN** the item reads `- "2026-10-15: it's here"`
-
-#### Scenario: Both quote characters keep single quotes
-
-- **WHEN** the caller pushes the text `it's "quoted": here` with automatic
-  style
-- **THEN** the item reads `- 'it''s "quoted": here'`
 
 #### Scenario: A folded item becomes one line
 

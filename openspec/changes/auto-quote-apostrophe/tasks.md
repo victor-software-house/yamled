@@ -2,13 +2,15 @@
 
 ## 1. Writer
 
-- [ ] 1.1 Skip the single-quoted candidate in the automatic order of
-  `render::text` when the text holds an apostrophe and no double quote.
-  Verify with the tests in 1.3 on the build host.
-- [ ] 1.2 Add `TextStyle::Line`, which tries plain, quoted, and double-quoted
-  only, ignoring the node's current style. Verify with the tests in 1.3.
-- [ ] 1.3 Add tests in `tests/edits.rs` for each new scenario. Verify that
-  `cargo test --test edits` passes on the build host.
+- [ ] 1.1 Add `Quotes` with `Auto`, `Single`, and `Double`, and
+  `Document::with_quotes`. Thread the document's quotes through `text`,
+  `value`, `flow_items`, and `flow_safe`. Verify with the tests in 1.3 on the
+  build host.
+- [ ] 1.2 Add `TextStyle::Line`, which ignores the node's current style and
+  writes no block scalar. Verify with the tests in 1.3.
+- [ ] 1.3 Add tests in `tests/edits.rs`: one case per step of `Quotes::Auto`,
+  `Single` and `Double`, every writer under each, and `Line` on block items.
+  Verify that `cargo test --test edits` passes on the build host.
 
 ## 2. Release
 
