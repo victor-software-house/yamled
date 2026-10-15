@@ -125,6 +125,18 @@ pub struct Document {
     spacing: Spacing,
     #[cfg(feature = "serde")]
     quotes: crate::Quotes,
+    /// The splices a [`Document::batch`] has recorded, in call order; `None`
+    /// outside a batch.
+    pending: Option<Vec<Splice>>,
+}
+
+/// One recorded edit: the bytes `from..to` of the text the batch began with,
+/// and what replaces them.
+#[derive(Clone, Debug)]
+struct Splice {
+    from: usize,
+    to: usize,
+    with: String,
 }
 
 impl Document {
@@ -151,6 +163,7 @@ impl Document {
             spacing: Spacing::default(),
             #[cfg(feature = "serde")]
             quotes: crate::Quotes::default(),
+            pending: None,
         })
     }
 
@@ -167,6 +180,34 @@ impl Document {
     pub fn with_quotes(mut self, quotes: crate::Quotes) -> Self {
         self.quotes = quotes;
         self
+    }
+
+    /// Run several edits and parse the result once, at the end.
+    ///
+    /// Inside `edits`, every path names the document as it was when the batch
+    /// began, and reads see that text: an edit does not move the nodes the
+    /// next one names. The edits must touch separate bytes; two inserts at
+    /// one place land in call order. When `edits` fails, or the result does
+    /// not parse, the document keeps its old text. A batch inside a batch
+    /// joins it.
+    ///
+    /// # Errors
+    ///
+    /// Whatever `edits` returns, [`Error::Unsupported`] for edits that
+    /// overlap, and [`Error::Invalid`] when the result does not parse.
+    pub fn batch<R>(
+        &mut self,
+        edits: impl FnOnce(&mut Self) -> Result<R, Error>,
+    ) -> Result<R, Error> {
+        if self.pending.is_some() {
+            return edits(self);
+        }
+        self.pending = Some(Vec::new());
+        let result = edits(self);
+        let splices = self.pending.take().unwrap_or_default();
+        let value = result?;
+        self.apply(splices)?;
+        Ok(value)
     }
 
     /// The current text.
@@ -702,8 +743,50 @@ impl Document {
         dash_before(&self.source, self.index.nodes[id].value.start)
     }
 
+    /// Replace the bytes `from..to` and parse the result, or record the
+    /// splice inside a batch. A splice that writes the bytes already there
+    /// changes nothing and costs no parse.
     fn commit_splice(&mut self, from: usize, to: usize, with: &str) -> Result<(), Error> {
+        if self.source[from..to] == *with {
+            return Ok(());
+        }
+        if let Some(pending) = &mut self.pending {
+            pending.push(Splice {
+                from,
+                to,
+                with: with.to_owned(),
+            });
+            return Ok(());
+        }
         let edited = [&self.source[..from], with, &self.source[to..]].concat();
+        let index = Index::build(&edited).map_err(|error| Error::Invalid {
+            message: error.to_string(),
+        })?;
+        self.commit(edited, index);
+        Ok(())
+    }
+
+    /// Apply a batch's splices to the text it began with, in byte order with
+    /// call order kept at one place, and parse once.
+    fn apply(&mut self, mut splices: Vec<Splice>) -> Result<(), Error> {
+        if splices.is_empty() {
+            return Ok(());
+        }
+        splices.sort_by_key(|splice| (splice.from, splice.to));
+        let mut edited = String::with_capacity(self.source.len());
+        let mut at = 0;
+        for splice in &splices {
+            if splice.from < at {
+                return Err(Error::Unsupported {
+                    path: Path::root(),
+                    what: "apply overlapping edits in one batch",
+                });
+            }
+            edited.push_str(&self.source[at..splice.from]);
+            edited.push_str(&splice.with);
+            at = splice.to;
+        }
+        edited.push_str(&self.source[at..]);
         let index = Index::build(&edited).map_err(|error| Error::Invalid {
             message: error.to_string(),
         })?;

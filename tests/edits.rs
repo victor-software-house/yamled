@@ -185,6 +185,94 @@ fn a_document_quotes_every_writer_as_its_quotes_say() {
 }
 
 #[test]
+fn a_flow_item_is_quoted_by_the_flow_rule() {
+    let mut document = doc(indoc! {"
+        tags: [a, b, c]
+    "});
+    let tags = root().key("tags");
+    document
+        .replace_text(&tags.clone().index(0), "x, y", TextStyle::Auto)
+        .unwrap();
+    document
+        .replace_text(&tags.clone().index(1), "it's [z]", TextStyle::Folded)
+        .unwrap();
+    document
+        .replace_text(&tags.clone().index(2), "a: b", TextStyle::Line)
+        .unwrap();
+    assert_eq!(
+        document.as_str(),
+        indoc! {r#"
+            tags: ['x, y', "it's [z]", 'a: b']
+        "#}
+    );
+}
+
+/// Every path in a batch names the text the batch began with, so the second
+/// replace still finds the item the inserts land before.
+#[test]
+fn a_batch_applies_its_edits_to_the_text_it_began_with() {
+    let source = indoc! {"
+        notes:
+          - >-
+            first: folded
+          - |-
+            one
+            two
+        tail: kept
+    "};
+    let mut document = doc(source);
+    let notes = root().key("notes");
+    document
+        .batch(|batch| {
+            batch.replace_text(&notes.clone().index(0), "first: folded", TextStyle::Line)?;
+            batch.replace_text(&notes.clone().index(1), "one", TextStyle::Line)?;
+            batch.insert_item_text(&notes, 2, "two", TextStyle::Line)?;
+            batch.insert_item_text(&notes, 2, "three", TextStyle::Line)?;
+            batch.replace_text(&root().key("tail"), "kept", TextStyle::Line)?;
+            assert_eq!(batch.as_str(), source);
+            Ok(())
+        })
+        .unwrap();
+    assert_eq!(
+        document.as_str(),
+        indoc! {"
+            notes:
+              - 'first: folded'
+              - one
+              - two
+              - three
+            tail: kept
+        "}
+    );
+}
+
+#[test]
+fn a_failed_batch_leaves_the_text_unchanged() {
+    let source = indoc! {"
+        notes:
+          - first
+          - second
+    "};
+    let mut document = doc(source);
+    let first = root().key("notes").index(0);
+    let overlapping = document.batch(|batch| {
+        batch.replace_text(&first, "one", TextStyle::Line)?;
+        batch.replace_text(&first, "two", TextStyle::Line)
+    });
+    assert!(
+        matches!(overlapping, Err(Error::Unsupported { .. })),
+        "{overlapping:?}"
+    );
+    assert_eq!(document.as_str(), source);
+    let failed = document.batch(|batch| {
+        batch.replace_text(&first, "one", TextStyle::Line)?;
+        batch.replace_text(&root().key("missing"), "x", TextStyle::Line)
+    });
+    assert!(failed.is_err());
+    assert_eq!(document.as_str(), source);
+}
+
+#[test]
 fn line_style_turns_a_block_item_into_one_line() {
     let mut document = doc(indoc! {"
         notes:
