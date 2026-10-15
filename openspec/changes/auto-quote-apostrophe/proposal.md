@@ -32,17 +32,25 @@ Queue row: YMD-011.
 - A replaced scalar that is already quoted keeps its quotes under
   `TextStyle::Auto`, as today.
 - One decision function serves block values and flow items, with the context
-  as a parameter; `flow_safe` and its separate rule go. One pass over the text
-  picks the quotes. Only a plain or block candidate is parsed back, so a
-  scalar costs at most one parse; quoted text is built by construction, and a
-  debug build parses it too.
+  as a parameter; `flow_safe` and its separate rule go.
+- The style is chosen from one pass over the text's bytes, with no parse and
+  no serialization. The pass encodes the family reader's own rules:
+  granit-parser's plain-scalar scanner, and serde-saphyr's resolution of a
+  plain scalar with strict booleans. Measured on the largest consumer ledger
+  (3089 strings), the round trip that proved plain text cost 3.1 µs per
+  string; the operator asked for nanoseconds. The reader stays the oracle in
+  differential tests and in debug assertions only.
 - `Document::batch` runs several edits and parses once at the end; a splice
   that writes the bytes already there costs no parse. Measured on the largest
   consumer ledger (3089 strings), one parse of a scalar takes 3.3 µs, and a
   reparse of the whole document after each splice takes 2.9 ms, so a
   300-item rewrite spent about 0.9 s reparsing.
-- serde-saphyr decides plain with its own `is_plain_value_safe`, which is
-  `pub(crate)`. If it becomes public, the plain probe can move to it.
+- serde-saphyr's own `is_plain_value_safe` is `pub(crate)` and stricter than
+  the reader: it quotes `inf` and `nan`, which the reader keeps as strings.
+  yamled learns from it, with attribution, and follows the reader instead.
+- A block scalar no longer holds a character only double quotes carry, such
+  as U+2028. Text holding one is double-quoted, as plain and single-quoted
+  text already was.
 
 ## Capabilities
 
@@ -52,14 +60,21 @@ None.
 
 ### Modified Capabilities
 
-- `edits`: the new requirement "A document declares its quotes", the quoting
+- `edits`: the new requirements "A document declares its quotes" and
+  "Choosing a style parses nothing", the quoting
   in "Replace a value", and the layout-only `TextStyle` in "Write text in a
   chosen block style".
 
 ## Impact
 
-- `src/render.rs`: `Quotes`, its order in `text` and `flow_safe`, and
-  `TextStyle::Line`. Both enums are `#[non_exhaustive]`.
+- `src/render.rs`: `Quotes`, its order in `text`, and `TextStyle::Line`.
+  Both enums are `#[non_exhaustive]`. `src/render/scan.rs`: the one-pass
+  decision, with differential tests against the reader in
+  `src/render/tests.rs`.
+- `benches/render.rs`: criterion benchmarks of the decision per string and of
+  a whole-ledger rewrite. criterion 0.8.2 is a new dev-dependency, without
+  its default plotting features. The benchmarks reach the decision through a
+  `#[doc(hidden)]` `yamled::bench` module that is not part of the API.
 - `src/document.rs`: the `quotes` field and `Document::with_quotes`, behind
   the `serde` feature like the writers that read it; `Document::batch`, and
   the skip for a splice that changes nothing.

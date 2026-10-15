@@ -60,24 +60,42 @@ single quotes.
 - **THEN** the item reads `- 'it''s "x": y'`, one escape against two
 - **AND** `it's 'odd': "x"` reads `- "it's 'odd': \"x\""`, two against three
 
-### Requirement: Quoting costs at most one parse
+### Requirement: Choosing a style parses nothing
 
-The writer SHALL pick the quoted style from one pass over the text, with no
-parse. It SHALL parse a candidate back only to prove plain text or a block
-scalar, and SHALL build quoted text by construction. Plain SHALL not be tried
-for a character only double quotes can carry.
+The writer SHALL choose a string's style from one pass over its bytes, with
+no parse and no serialization: whether it can be plain in a block or flow
+context, which quotes it takes, and whether a block scalar holds it. The
+family reader, serde-saphyr with strict booleans, SHALL read every written
+form back as the same string, and plain SHALL be chosen exactly when that
+reader reads the unquoted text back as the string.
 
-#### Scenario: A note that needs quotes is written without a second parse
+#### Scenario: Words the reader keeps as strings stay plain
 
-- **WHEN** the caller pushes `a: b` in one-line style
-- **THEN** the writer parses the plain candidate once, rejects it, and writes
-  `- 'a: b'` without parsing it
+- **WHEN** the caller pushes `yes`, `on`, `inf`, `2026-10-15`, and `<<` in
+  one-line style
+- **THEN** the items read `- yes`, `- on`, `- inf`, `- 2026-10-15`, and
+  `- <<`
+
+#### Scenario: Text the reader resolves to another type is quoted
+
+- **WHEN** the caller pushes `True`, `NULL`, `~`, `0x1F`, `1_000`, `0755`,
+  `1e5`, and `-.INF` in one-line style
+- **THEN** each item is single-quoted, as `- 'True'` and `- '0755'`
+
+#### Scenario: The decision agrees with the reader
+
+- **WHEN** every string of the YAML test suite, of the consumer ledgers, and
+  of a generator biased toward indicators, colons, hashes, spaces, numerals,
+  and non-ASCII text is decided in block and flow context
+- **THEN** plain, literal, and folded are each chosen exactly when the reader
+  reads that form back as the string
 
 ### Requirement: A flow item is written by the flow rule
 
-A scalar written inside a flow collection SHALL be proven plain by parsing it
-inside `[...]`, so `,`, `[`, `]`, `{`, and `}` force quotes there, and SHALL
-never be written as a block scalar, whatever layout the caller asked for.
+A scalar written inside a flow collection SHALL be decided by the rules the
+reader applies inside `[...]`, so `,`, `[`, `]`, `{`, and `}` force quotes
+there, and SHALL never be written as a block scalar, whatever layout the
+caller asked for.
 
 #### Scenario: Flow punctuation forces quotes
 
@@ -181,7 +199,9 @@ text, then try a literal block for text with a line break, then one line.
 One-line layout SHALL ignore the node's current style and never write a block
 scalar, so a block scalar it replaces becomes one line, and text with a line
 break is double-quoted with `\n` escapes. An indentation indicator SHALL be
-written only when the text starts with a space.
+written only when the text starts with a space. A block scalar SHALL not hold
+a character only double quotes carry, such as U+2028; such text SHALL be
+double-quoted.
 
 #### Scenario: A dated note is folded without an indentation indicator
 
@@ -200,3 +220,8 @@ written only when the text starts with a space.
 - **WHEN** a list item reads `- |-` followed by the lines `first` and `second`
 - **AND** the caller replaces it with the same text in one-line style
 - **THEN** the item reads `- "first\nsecond"`
+
+#### Scenario: A line separator is never written raw in a block
+
+- **WHEN** the caller pushes `a`, U+2028, and `b` with literal style
+- **THEN** the item reads `- "a\u2028b"`
