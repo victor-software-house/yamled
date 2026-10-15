@@ -61,6 +61,84 @@ fn a_plain_title_that_now_needs_quoting_is_quoted_once() {
 }
 
 #[test]
+fn a_title_with_an_apostrophe_is_double_quoted_unless_already_single_quoted() {
+    let mut document = doc(indoc! {"
+        - title: Old
+        - title: 'Old: one'
+    "});
+    document
+        .replace(&root().index(0).key("title"), "It's done: mostly")
+        .unwrap();
+    document
+        .replace(&root().index(1).key("title"), "It's done: mostly")
+        .unwrap();
+    let expected = indoc! {r#"
+        - title: "It's done: mostly"
+        - title: 'It''s done: mostly'
+    "#};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
+fn automatic_text_with_an_apostrophe_avoids_a_doubled_quote() {
+    let mut document = doc(indoc! {"
+        notes:
+          - first
+    "});
+    let notes = root().key("notes");
+    document
+        .push_text(&notes, "2026-10-15: it's here", TextStyle::Auto)
+        .unwrap();
+    document
+        .push_text(&notes, r#"it's "quoted": here"#, TextStyle::Auto)
+        .unwrap();
+    document.push(&notes, "it's plain").unwrap();
+    let expected = indoc! {r#"
+        notes:
+          - first
+          - "2026-10-15: it's here"
+          - 'it''s "quoted": here'
+          - it's plain
+    "#};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
+fn line_style_turns_a_block_item_into_one_line() {
+    let mut document = doc(indoc! {"
+        notes:
+          - >2-
+            2026-09-28: a folded note
+          - |-
+            first
+            second
+          - kept
+    "});
+    let notes = root().key("notes");
+    document
+        .replace_text(
+            &notes.clone().index(0),
+            "2026-09-28: a folded note",
+            TextStyle::Line,
+        )
+        .unwrap();
+    document
+        .replace_text(&notes.clone().index(1), "first\nsecond", TextStyle::Line)
+        .unwrap();
+    document
+        .insert_item_text(&notes, 2, "it's: inserted", TextStyle::Line)
+        .unwrap();
+    let expected = indoc! {r#"
+        notes:
+          - '2026-09-28: a folded note'
+          - "first\nsecond"
+          - "it's: inserted"
+          - kept
+    "#};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
 fn a_quoted_scalar_stays_quoted_and_a_folded_one_stays_folded() {
     let mut document = doc(indoc! {r#"
         title: "Old"

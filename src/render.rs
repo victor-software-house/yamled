@@ -17,6 +17,8 @@ use crate::text::{LF, indent, join, spaced, terminated};
 pub enum TextStyle {
     /// Plain when it reads back unchanged, else single-quoted, else
     /// double-quoted; a string with line breaks tries a literal block first.
+    /// Text with an apostrophe and no double quote skips single quotes, so
+    /// it is never written with a doubled `''`.
     #[default]
     Auto,
     /// A folded block, `>-`, for one long line. Falls back to [`Self::Auto`]
@@ -24,6 +26,11 @@ pub enum TextStyle {
     Folded,
     /// A literal block, `|-`, which keeps every line break.
     Literal,
+    /// One line, in the order [`Self::Auto`] tries after its literal block:
+    /// plain, quoted, or double-quoted with `\n` escapes. It ignores the
+    /// node's current style, so replacing a block scalar with it leaves one
+    /// line.
+    Line,
 }
 
 /// What a value looks like before it is placed, relative to column 0.
@@ -267,23 +274,32 @@ pub(crate) fn flow_safe(head: &str) -> String {
 
 /// Write a string in the first style that reads back as the same string:
 /// the caller's `style`, then the node's current style, then the automatic
-/// order.
+/// order. The automatic order skips single quotes for text with an
+/// apostrophe and no double quote, as [`flow_safe`] does, because `''` reads
+/// worse than `"`; text holding both keeps single quotes, which need no
+/// backslash. [`TextStyle::Line`] skips the node's style and the literal
+/// block, so only one-line styles remain.
 pub(crate) fn text(
     value: &str,
     style: TextStyle,
     preferred: Option<Style>,
 ) -> Result<Rendered, Error> {
     let requested = match style {
-        TextStyle::Auto => None,
+        TextStyle::Auto | TextStyle::Line => None,
         TextStyle::Folded => Some(Style::Folded),
         TextStyle::Literal => Some(Style::Literal),
     };
-    let multiline = value.contains(LF).then_some(Style::Literal);
+    let blocks = style != TextStyle::Line;
+    let preferred = preferred.filter(|style| blocks && style.is_scalar());
+    let multiline = (blocks && value.contains(LF)).then_some(Style::Literal);
+    let single = (!value.contains('\'') || value.contains('"')).then_some(Style::SingleQuoted);
     requested
         .into_iter()
-        .chain(preferred.filter(|style| style.is_scalar()))
+        .chain(preferred)
         .chain(multiline)
-        .chain([Style::Plain, Style::SingleQuoted, Style::DoubleQuoted])
+        .chain([Style::Plain])
+        .chain(single)
+        .chain([Style::DoubleQuoted])
         .filter_map(|candidate| scalar(value, candidate))
         .find(|rendered| reads_back(rendered, value))
         .ok_or_else(|| Error::Serialize {
