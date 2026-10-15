@@ -202,14 +202,17 @@ impl Document {
     /// the result does not parse, the document keeps its old text. A batch
     /// inside a batch joins it.
     ///
+    /// `edits` may return the caller's own error type, so a caller that wraps
+    /// a document can run its own steps inside one batch.
+    ///
     /// # Errors
     ///
     /// Whatever `edits` returns, [`Error::Unsupported`] for edits that
     /// overlap, and [`Error::Invalid`] when the result does not parse.
-    pub fn batch<R>(
+    pub fn batch<R, E: From<Error>>(
         &mut self,
-        edits: impl FnOnce(&mut Self) -> Result<R, Error>,
-    ) -> Result<R, Error> {
+        edits: impl FnOnce(&mut Self) -> Result<R, E>,
+    ) -> Result<R, E> {
         if self.pending.is_some() {
             return edits(self);
         }

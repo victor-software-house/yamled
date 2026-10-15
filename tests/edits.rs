@@ -230,7 +230,7 @@ fn a_batch_applies_its_edits_to_the_text_it_began_with() {
             batch.insert_item_text(&notes, 2, "three", TextStyle::Line)?;
             batch.replace_text(&root().key("tail"), "kept", TextStyle::Line)?;
             assert_eq!(batch.as_str(), source);
-            Ok(())
+            Ok::<(), Error>(())
         })
         .unwrap();
     assert_eq!(
@@ -270,6 +270,42 @@ fn a_failed_batch_leaves_the_text_unchanged() {
     });
     assert!(failed.is_err());
     assert_eq!(document.as_str(), source);
+}
+
+/// A caller's own error, which a batch converts yamled's errors into.
+#[derive(Debug)]
+enum Failure {
+    Yaml(Error),
+    Domain,
+}
+
+impl From<Error> for Failure {
+    fn from(error: Error) -> Self {
+        Self::Yaml(error)
+    }
+}
+
+#[test]
+fn a_batch_returns_the_callers_error_and_keeps_the_text() {
+    let source = indoc! {"
+        notes:
+          - first
+    "};
+    let mut document = doc(source);
+    let failed = document.batch(|batch| {
+        batch.replace_text(&root().key("notes").index(0), "one", TextStyle::Line)?;
+        Err::<(), Failure>(Failure::Domain)
+    });
+    assert!(matches!(failed, Err(Failure::Domain)), "{failed:?}");
+    assert_eq!(document.as_str(), source);
+    let missing = document.batch(|batch| {
+        batch.replace_text(&root().key("missing"), "x", TextStyle::Line)?;
+        Ok::<(), Failure>(())
+    });
+    assert!(
+        matches!(missing, Err(Failure::Yaml(Error::NoNode { .. }))),
+        "{missing:?}"
+    );
 }
 
 #[test]
