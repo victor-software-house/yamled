@@ -7,3 +7,5 @@ New `Quotes`, set per document with `Document::with_quotes`, chooses the quotes 
 `TextStyle` now chooses layout only. New `TextStyle::Line` writes a string on one line whatever the node's current style, so `replace_text` can turn a folded or literal item into one line.
 
 One decision function quotes block values and flow items alike, from one pass over the text, with at most one parse per scalar. New `Document::batch` runs several edits and parses once at the end, and an edit that writes the bytes already there no longer reparses the document.
+
+`Document::batch` accepts the caller's own error type. yamled now builds on serde-saphyr 2.0.0 and granit-parser 2.0.0.
