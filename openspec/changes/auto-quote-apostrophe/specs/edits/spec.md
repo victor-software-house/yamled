@@ -60,6 +60,64 @@ single quotes.
 - **THEN** the item reads `- 'it''s "x": y'`, one escape against two
 - **AND** `it's 'odd': "x"` reads `- "it's 'odd': \"x\""`, two against three
 
+### Requirement: Quoting costs at most one parse
+
+The writer SHALL pick the quoted style from one pass over the text, with no
+parse. It SHALL parse a candidate back only to prove plain text or a block
+scalar, and SHALL build quoted text by construction. Plain SHALL not be tried
+for a character only double quotes can carry.
+
+#### Scenario: A note that needs quotes is written without a second parse
+
+- **WHEN** the caller pushes `a: b` in one-line style
+- **THEN** the writer parses the plain candidate once, rejects it, and writes
+  `- 'a: b'` without parsing it
+
+### Requirement: A flow item is written by the flow rule
+
+A scalar written inside a flow collection SHALL be proven plain by parsing it
+inside `[...]`, so `,`, `[`, `]`, `{`, and `}` force quotes there, and SHALL
+never be written as a block scalar, whatever layout the caller asked for.
+
+#### Scenario: Flow punctuation forces quotes
+
+- **WHEN** a row has `tags: [a, b, c]`
+- **AND** the caller replaces the items with `x, y` (automatic layout),
+  `it's [z]` (folded layout), and `a: b` (one line)
+- **THEN** the line reads `tags: ['x, y', "it's [z]", 'a: b']`
+
+### Requirement: A batch of edits parses once
+
+`Document::batch` SHALL run several edits and parse the result once. Inside a
+batch every path SHALL name the text as it was when the batch began, two
+inserts at one place SHALL land in call order, and edits that touch the same
+bytes SHALL be refused. When an edit fails or the result does not parse, the
+document SHALL keep its old text.
+
+#### Scenario: Edits name the text the batch began with
+
+- **WHEN** a list holds a folded item and a two-line literal item
+- **AND** one batch replaces both on one line and inserts `two` and `three`
+  at index 2
+- **THEN** the list reads the first item, `one`, `two`, `three`, in that order
+
+#### Scenario: Overlapping edits leave the text unchanged
+
+- **WHEN** one batch replaces the same item twice
+- **THEN** the batch fails with an unsupported-edit error
+- **AND** the document's text is what it was before the batch
+
+### Requirement: An edit that changes nothing costs nothing
+
+An edit whose rendering equals the bytes already there SHALL leave the text
+as it is without parsing it again, inside a batch or outside one.
+
+#### Scenario: Rewriting a value as it is written
+
+- **WHEN** a row has `tail: kept`
+- **AND** the caller replaces `tail` with `kept` in one-line style
+- **THEN** the text is unchanged and the document was not parsed again
+
 ## MODIFIED Requirements
 
 ### Requirement: Replace a value

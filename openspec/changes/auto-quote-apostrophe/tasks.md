@@ -11,6 +11,13 @@
 - [ ] 1.3 Add tests in `tests/edits.rs`: one case per step of `Quotes::Auto`,
   `Single` and `Double`, every writer under each, and `Line` on block items.
   Verify that `cargo test --test edits` passes on the build host.
+- [ ] 1.4 One decision function with a block or flow context, one scan,
+  and at most one parse per scalar; remove `flow_safe`. Verify the flow test
+  in `tests/edits.rs` passes, and count parses per scalar on the largest
+  consumer ledger on the build host.
+- [ ] 1.5 Add `Document::batch` and the skip for unchanged splices. Verify
+  the batch tests in `tests/edits.rs` pass, and time a 300-item rewrite and a
+  whole-ledger `qctl fmt` before and after on the build host.
 
 ## 2. Release
 

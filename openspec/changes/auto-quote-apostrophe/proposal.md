@@ -31,6 +31,18 @@ Queue row: YMD-011.
   and a remove and insert would drop the comments the item owns.
 - A replaced scalar that is already quoted keeps its quotes under
   `TextStyle::Auto`, as today.
+- One decision function serves block values and flow items, with the context
+  as a parameter; `flow_safe` and its separate rule go. One pass over the text
+  picks the quotes. Only a plain or block candidate is parsed back, so a
+  scalar costs at most one parse; quoted text is built by construction, and a
+  debug build parses it too.
+- `Document::batch` runs several edits and parses once at the end; a splice
+  that writes the bytes already there costs no parse. Measured on the largest
+  consumer ledger (3089 strings), one parse of a scalar takes 3.3 µs, and a
+  reparse of the whole document after each splice takes 2.9 ms, so a
+  300-item rewrite spent about 0.9 s reparsing.
+- serde-saphyr decides plain with its own `is_plain_value_safe`, which is
+  `pub(crate)`. If it becomes public, the plain probe can move to it.
 
 ## Capabilities
 
@@ -49,7 +61,8 @@ None.
 - `src/render.rs`: `Quotes`, its order in `text` and `flow_safe`, and
   `TextStyle::Line`. Both enums are `#[non_exhaustive]`.
 - `src/document.rs`: the `quotes` field and `Document::with_quotes`, behind
-  the `serde` feature like the writers that read it.
+  the `serde` feature like the writers that read it; `Document::batch`, and
+  the skip for a splice that changes nothing.
 - Callers that write new text with an apostrophe and no double quote get
   double quotes. Bytes already in a file do not change.
 - Released as a patch, 0.0.7; qctl takes it for its QCTL-039.
