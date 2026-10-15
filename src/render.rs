@@ -400,6 +400,16 @@ pub(crate) fn text(
         })
 }
 
+/// The one line every writer writes for `value` in a block or flow context.
+#[must_use]
+pub fn line(value: &str, quotes: Quotes, flow: bool) -> String {
+    let context = if flow { Context::Flow } else { Context::Block };
+    text(value, TextStyle::Line, quotes, None, context)
+        .ok()
+        .and_then(|rendered| rendered.inline_head().map(str::to_owned))
+        .unwrap_or_default()
+}
+
 /// `value` in `style` when that style holds it, proven as [`text`] says.
 fn written(value: &str, style: Style, scan: Scan, context: Context) -> Option<Rendered> {
     let quoted = |rendered: Rendered| {

@@ -63,3 +63,11 @@ pub use crate::index::{Location, Style};
 pub use crate::path::{Path, Segment};
 #[cfg(feature = "serde")]
 pub use crate::render::{Quotes, TextStyle};
+
+/// The writer's style decision, for the benchmarks in `benches/`. Not part
+/// of the API: it may change in any release.
+#[doc(hidden)]
+#[cfg(feature = "serde")]
+pub mod bench {
+    pub use crate::render::line;
+}
