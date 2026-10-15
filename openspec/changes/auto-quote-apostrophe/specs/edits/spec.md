@@ -91,8 +91,9 @@ never be written as a block scalar, whatever layout the caller asked for.
 `Document::batch` SHALL run several edits and parse the result once. Inside a
 batch every path SHALL name the text as it was when the batch began, two
 inserts at one place SHALL land in call order, and edits that touch the same
-bytes SHALL be refused. When an edit fails or the result does not parse, the
-document SHALL keep its old text.
+bytes, a key inserted twice into one mapping, and a re-indent, which needs a
+parse to prove itself, SHALL be refused. When an edit fails or the result does
+not parse, the document SHALL keep its old text.
 
 #### Scenario: Edits name the text the batch began with
 
@@ -100,6 +101,12 @@ document SHALL keep its old text.
 - **AND** one batch replaces both on one line and inserts `two` and `three`
   at index 2
 - **THEN** the list reads the first item, `one`, `two`, `three`, in that order
+
+#### Scenario: A key inserted twice in one batch is refused
+
+- **WHEN** one batch inserts the key `scope` into the same mapping twice
+- **THEN** the batch fails with a key-exists error
+- **AND** the document's text is what it was before the batch
 
 #### Scenario: Overlapping edits leave the text unchanged
 
