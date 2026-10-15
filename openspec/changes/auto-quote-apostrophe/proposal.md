@@ -5,8 +5,8 @@
 Automatic text style writes an apostrophe as a doubled single quote.
 `render::text` tries plain, then single-quoted, then double-quoted, so the note
 `it's: here` is written `'it''s: here'`.
-qctl writes every ledger list item through this style, and five of its consumer
-ledgers already carry nine doubled quotes (verctl 5, templates 3, qctl 1).
+qctl writes every ledger list item through this style, and three of its
+consumer ledgers already carry nine doubled quotes; verctl holds 5 and qctl 1.
 `flow_safe` already prefers double quotes for an apostrophe inside a flow
 collection, so the two writers disagree today.
 
