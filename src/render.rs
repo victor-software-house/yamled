@@ -492,7 +492,7 @@ fn escape(value: &str) -> String {
             '\t' => out.push_str(r"\t"),
             '\r' => out.push_str(r"\r"),
             '\0' => out.push_str(r"\0"),
-            c if c.is_control() || matches!(c, '\u{85}' | '\u{2028}' | '\u{2029}' | '\u{feff}') => {
+            c if double_only(c) => {
                 // Writing to a String cannot fail.
                 let _ = write!(out, r"\u{:04X}", u32::from(c));
             }

@@ -125,9 +125,19 @@ pub struct Document {
     spacing: Spacing,
     #[cfg(feature = "serde")]
     quotes: crate::Quotes,
-    /// The splices a [`Document::batch`] has recorded, in call order; `None`
-    /// outside a batch.
-    pending: Option<Vec<Splice>>,
+    /// What a [`Document::batch`] has recorded; `None` outside a batch.
+    pending: Option<Pending>,
+}
+
+/// The edits a batch has recorded against the text it began with.
+#[derive(Clone, Debug, Default)]
+struct Pending {
+    /// The splices, in call order.
+    splices: Vec<Splice>,
+    /// The keys inserted so far, by mapping node, which the starting index
+    /// cannot show to the next insert.
+    #[cfg(feature = "serde")]
+    keys: Vec<(usize, String)>,
 }
 
 /// One recorded edit: the bytes `from..to` of the text the batch began with,
@@ -187,9 +197,10 @@ impl Document {
     /// Inside `edits`, every path names the document as it was when the batch
     /// began, and reads see that text: an edit does not move the nodes the
     /// next one names. The edits must touch separate bytes; two inserts at
-    /// one place land in call order. When `edits` fails, or the result does
-    /// not parse, the document keeps its old text. A batch inside a batch
-    /// joins it.
+    /// one place land in call order. [`Document::reindent`] proves its result
+    /// with a parse, so it is refused inside a batch. When `edits` fails, or
+    /// the result does not parse, the document keeps its old text. A batch
+    /// inside a batch joins it.
     ///
     /// # Errors
     ///
@@ -202,11 +213,11 @@ impl Document {
         if self.pending.is_some() {
             return edits(self);
         }
-        self.pending = Some(Vec::new());
+        self.pending = Some(Pending::default());
         let result = edits(self);
-        let splices = self.pending.take().unwrap_or_default();
+        let pending = self.pending.take().unwrap_or_default();
         let value = result?;
-        self.apply(splices)?;
+        self.apply(pending.splices)?;
         Ok(value)
     }
 
@@ -751,7 +762,7 @@ impl Document {
             return Ok(());
         }
         if let Some(pending) = &mut self.pending {
-            pending.push(Splice {
+            pending.splices.push(Splice {
                 from,
                 to,
                 with: with.to_owned(),

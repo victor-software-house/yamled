@@ -347,7 +347,35 @@ impl Document {
         }
     }
 
+    /// Insert an entry, refusing a key that an earlier insert in the same
+    /// batch already added to this mapping.
     fn insert_rendered(
+        &mut self,
+        path: &Path,
+        key: &str,
+        rendered: &Rendered,
+        position: Position<'_>,
+    ) -> Result<(), Error> {
+        let id = self.id(path)?;
+        let inserted = |pending: &super::Pending| {
+            pending
+                .keys
+                .iter()
+                .any(|(mapping, name)| *mapping == id && name == key)
+        };
+        if self.pending.as_ref().is_some_and(inserted) {
+            return Err(Error::KeyExists {
+                path: path.clone().key(key),
+            });
+        }
+        self.insert_entry(path, key, rendered, position)?;
+        if let Some(pending) = &mut self.pending {
+            pending.keys.push((id, key.to_owned()));
+        }
+        Ok(())
+    }
+
+    fn insert_entry(
         &mut self,
         path: &Path,
         key: &str,

@@ -273,6 +273,49 @@ fn a_failed_batch_leaves_the_text_unchanged() {
 }
 
 #[test]
+fn a_batch_refuses_what_its_starting_text_cannot_prove() {
+    let source = indoc! {"
+        row:
+          title: t
+        list:
+          - a
+    "};
+    let mut document = doc(source);
+    let row = root().key("row");
+    let twice = document.batch(|batch| {
+        batch.insert(&row, "scope", "s", Position::End)?;
+        batch.insert(&row, "scope", "s", Position::End)
+    });
+    assert!(matches!(twice, Err(Error::KeyExists { .. })), "{twice:?}");
+    assert_eq!(document.as_str(), source);
+    let reindent = document.batch(|batch| batch.reindent(&root().key("list"), 4));
+    assert!(
+        matches!(reindent, Err(Error::Unsupported { .. })),
+        "{reindent:?}"
+    );
+    assert_eq!(document.as_str(), source);
+}
+
+#[test]
+fn a_noncharacter_is_escaped_inside_double_quotes() {
+    let mut document = doc(indoc! {"
+        notes:
+          - first
+    "});
+    document
+        .push_text(&root().key("notes"), "a\u{fffe}b", TextStyle::Line)
+        .unwrap();
+    assert_eq!(
+        document.as_str(),
+        indoc! {r#"
+            notes:
+              - first
+              - "a\uFFFEb"
+        "#}
+    );
+}
+
+#[test]
 fn line_style_turns_a_block_item_into_one_line() {
     let mut document = doc(indoc! {"
         notes:
