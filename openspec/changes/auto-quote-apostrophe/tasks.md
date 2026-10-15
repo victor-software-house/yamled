@@ -18,6 +18,9 @@
 - [ ] 1.5 Add `Document::batch` and the skip for unchanged splices. Verify
   the batch tests in `tests/edits.rs` pass, and time a 300-item rewrite and a
   whole-ledger `qctl fmt` before and after on the build host.
+- [ ] 1.6 Move serde-saphyr and granit-parser to 2.0.0 in their own
+  commit. Verify `mise run verify` passes on the build host and the cost of
+  one `reads_back` on the largest consumer ledger has not regressed.
 
 ## 2. Release
 

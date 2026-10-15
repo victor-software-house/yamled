@@ -65,4 +65,10 @@ None.
   the skip for a splice that changes nothing.
 - Callers that write new text with an apostrophe and no double quote get
   double quotes. Bytes already in a file do not change.
+- `Cargo.toml`: serde-saphyr 1.3.0 to 2.0.0 and granit-parser 1.3.0 to
+  2.0.0, in one commit, so consumers take one yamled bump. yamled keeps
+  granit-parser's default features, because the index reads its comment
+  events. None of 2.0.0's breaking changes reaches yamled's code: it builds no
+  `Error::AliasError`, constructs no `Span`, and reads the end span only of
+  flow collections, not of the indentless sequence whose span changed.
 - Released as a patch, 0.0.7; qctl takes it for its QCTL-039.

@@ -89,11 +89,10 @@ never be written as a block scalar, whatever layout the caller asked for.
 ### Requirement: A batch of edits parses once
 
 `Document::batch` SHALL run several edits and parse the result once. Inside a
-batch every path SHALL name the text as it was when the batch began, two
-inserts at one place SHALL land in call order, and edits that touch the same
-bytes, a key inserted twice into one mapping, and a re-indent, which needs a
-parse to prove itself, SHALL be refused. When an edit fails or the result does
-not parse, the document SHALL keep its old text.
+batch every path SHALL name the text as it was when the batch began, and two
+inserts at one place SHALL land in call order. When an edit fails, including
+with the caller's own error type, or the result does not parse, the document
+SHALL keep its old text.
 
 #### Scenario: Edits name the text the batch began with
 
@@ -101,6 +100,17 @@ not parse, the document SHALL keep its old text.
 - **AND** one batch replaces both on one line and inserts `two` and `three`
   at index 2
 - **THEN** the list reads the first item, `one`, `two`, `three`, in that order
+
+#### Scenario: A caller's error ends the batch
+
+- **WHEN** a batch replaces an item and then returns the caller's own error
+- **THEN** the batch returns that error
+- **AND** the document's text is what it was before the batch
+
+### Requirement: A batch refuses edits its starting text cannot prove
+
+A batch SHALL refuse edits that touch the same bytes, a key inserted twice
+into one mapping, and a re-indent, which needs a parse to prove itself.
 
 #### Scenario: A key inserted twice in one batch is refused
 
