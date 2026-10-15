@@ -11,6 +11,12 @@ use crate::Error;
 use crate::index::{Index, Style};
 use crate::text::{LF, indent, join, spaced, terminated};
 
+mod scan;
+#[cfg(test)]
+mod tests;
+
+use scan::Scan;
+
 /// The layout a string is written in: block or one line. Which quotes a
 /// one-line string gets is the document's [`Quotes`], not this.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -71,7 +77,7 @@ impl Quotes {
             Self::Single => true,
             Self::Double => false,
         };
-        if prefers_single && !scan.double_only {
+        if prefers_single && !scan.double_only() {
             Style::SingleQuoted
         } else {
             Style::DoubleQuoted
@@ -86,35 +92,6 @@ impl Quotes {
 pub(crate) enum Context {
     Block,
     Flow,
-}
-
-/// What one pass over a string finds that decides its quotes: the escapes
-/// each quoted form needs, and whether only double quotes can hold it.
-#[derive(Clone, Copy, Debug, Default)]
-struct Scan {
-    /// Each one is doubled inside single quotes.
-    apostrophes: usize,
-    /// Each one is escaped inside double quotes.
-    quotes: usize,
-    /// Backslashes and tabs, each escaped inside double quotes.
-    backslashes: usize,
-    /// A line break, or another character only double quotes carry.
-    double_only: bool,
-}
-
-impl Scan {
-    fn of(value: &str) -> Self {
-        value.chars().fold(Self::default(), |mut scan, c| {
-            match c {
-                '\'' => scan.apostrophes += 1,
-                '"' => scan.quotes += 1,
-                '\\' | '\t' => scan.backslashes += 1,
-                c if double_only(c) => scan.double_only = true,
-                _ => {}
-            }
-            scan
-        })
-    }
 }
 
 /// A character a single-quoted or plain scalar cannot hold on one line: a
@@ -367,10 +344,9 @@ fn serialize<T: Serialize + ?Sized>(value: &T, compact: bool) -> Result<String, 
 /// which hold any string. [`TextStyle::Line`] and a flow `context` skip the
 /// block styles, so only one-line styles remain.
 ///
-/// Only a block style and plain text are parsed back to prove them, at most
-/// one parse each; plain is skipped for a character only double quotes
-/// carry. Quoted text holds its string by construction, which a debug build
-/// proves by parsing it too.
+/// One pass over the bytes decides which styles hold the string, by the
+/// reader's own rules, so nothing is parsed. A debug build parses every
+/// candidate it weighs and asserts the reader agrees.
 pub(crate) fn text(
     value: &str,
     style: TextStyle,
@@ -387,7 +363,7 @@ pub(crate) fn text(
     let block = |style: &Style| blocks || !matches!(style, Style::Literal | Style::Folded);
     let preferred = preferred.filter(|style| style.is_scalar() && block(style));
     let multiline = (blocks && value.contains(LF)).then_some(Style::Literal);
-    let scan = Scan::of(value);
+    let scan = Scan::of(value, context);
     requested
         .filter(block)
         .into_iter()
@@ -410,41 +386,58 @@ pub fn line(value: &str, quotes: Quotes, flow: bool) -> String {
         .unwrap_or_default()
 }
 
-/// `value` in `style` when that style holds it, proven as [`text`] says.
+/// `value` in `style` when the scan says that style holds it.
 fn written(value: &str, style: Style, scan: Scan, context: Context) -> Option<Rendered> {
-    let quoted = |rendered: Rendered| {
-        debug_assert!(reads_back(&rendered, value, context), "{rendered:?}");
-        rendered
-    };
-    match style {
-        Style::Plain | Style::SingleQuoted if scan.double_only => None,
-        Style::SingleQuoted => Some(quoted(Rendered::inline(single(value)))),
-        Style::DoubleQuoted => Some(quoted(Rendered::inline(double(value)))),
-        Style::Plain | Style::Literal | Style::Folded => {
-            scalar(value, style).filter(|rendered| reads_back(rendered, value, context))
-        }
+    let holds = match style {
+        Style::Plain => scan.plain,
+        Style::SingleQuoted => !scan.double_only(),
+        Style::DoubleQuoted => true,
+        Style::Literal => scan.literal,
+        Style::Folded => scan.folded,
         Style::Alias
         | Style::BlockSequence
         | Style::FlowSequence
         | Style::BlockMapping
-        | Style::FlowMapping => None,
+        | Style::FlowMapping => false,
+    };
+    debug_assert_eq!(
+        holds,
+        proven(value, style, context),
+        "{style:?} in {context:?} for {value:?}"
+    );
+    if !holds {
+        return None;
     }
+    laid_out(value, style)
 }
 
-/// `value` laid out as plain text or a block scalar, when that layout can
-/// carry it at all.
-fn scalar(value: &str, style: Style) -> Option<Rendered> {
+/// Whether the reader reads `value` written in `style` back as itself. Only
+/// double quotes may carry a character [`double_only`] names, and a block
+/// scalar may carry a line break. The oracle for the debug assertion in
+/// [`written`] and for the tests.
+fn proven(value: &str, style: Style, context: Context) -> bool {
+    let escaped = |c: char| double_only(c) && !(style == Style::Literal && c == LF);
+    let carried = style == Style::DoubleQuoted || !value.chars().any(escaped);
+    let block = matches!(style, Style::Literal | Style::Folded);
+    carried
+        && !(block && context == Context::Flow)
+        && laid_out(value, style).is_some_and(|rendered| reads_back(&rendered, value, context))
+}
+
+/// `value` laid out in `style`, when that layout can carry it at all: plain
+/// and folded text on one line, and no block scalar for empty text.
+fn laid_out(value: &str, style: Style) -> Option<Rendered> {
     let one_line = !value.contains(LF);
     match style {
         Style::Plain if one_line && !value.is_empty() => Some(Rendered::inline(value)),
+        Style::SingleQuoted => Some(Rendered::inline(single(value))),
+        Style::DoubleQuoted => Some(Rendered::inline(double(value))),
         Style::Folded if one_line && !value.is_empty() => Some(Rendered::Scalar {
             head: format!(">{}-", indicator(value)),
             body: vec![value.to_owned()],
         }),
         Style::Literal if !value.is_empty() => Some(literal(value)),
         Style::Plain
-        | Style::SingleQuoted
-        | Style::DoubleQuoted
         | Style::Literal
         | Style::Folded
         | Style::Alias

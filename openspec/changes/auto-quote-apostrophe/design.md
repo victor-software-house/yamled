@@ -22,7 +22,8 @@ resolves with when `strict_booleans` is set:
 
 1. Plain text is not empty, does not start or end with a space or tab, and
    does not start with an indicator (`,[]{}#&*!|>'"%@` and the backtick).
-   `-`, `?`, and `:` start it only when a non-space follows.
+   `-`, `?`, and `:` start it only when a non-space follows; in flow
+   context a lone `?` is plain.
 2. `:` before a space, a tab, or the end, and `#` after a space or tab, end
    it. In flow context, so do `,`, `[`, `]`, `{`, and `}`.
 3. The reader resolves `~`, `null`, `true`, and `false` in any case, and
