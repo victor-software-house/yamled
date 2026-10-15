@@ -62,4 +62,4 @@ pub use crate::error::Error;
 pub use crate::index::{Location, Style};
 pub use crate::path::{Path, Segment};
 #[cfg(feature = "serde")]
-pub use crate::render::TextStyle;
+pub use crate::render::{Quotes, TextStyle};

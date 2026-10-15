@@ -11,14 +11,14 @@ use crate::Error;
 use crate::index::{Index, Style};
 use crate::text::{LF, indent, join, spaced, terminated};
 
-/// How a string should be written when the caller has a preference.
+/// The layout a string is written in: block or one line. Which quotes a
+/// one-line string gets is the document's [`Quotes`], not this.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum TextStyle {
-    /// Plain when it reads back unchanged, else single-quoted, else
-    /// double-quoted; a string with line breaks tries a literal block first.
-    /// Text with an apostrophe and no double quote skips single quotes, so
-    /// it is never written with a doubled `''`.
+    /// The node's current style when it can hold the text, then a literal
+    /// block for text with line breaks, then one line as [`Self::Line`]
+    /// writes it.
     #[default]
     Auto,
     /// A folded block, `>-`, for one long line. Falls back to [`Self::Auto`]
@@ -26,11 +26,63 @@ pub enum TextStyle {
     Folded,
     /// A literal block, `|-`, which keeps every line break.
     Literal,
-    /// One line, in the order [`Self::Auto`] tries after its literal block:
-    /// plain, quoted, or double-quoted with `\n` escapes. It ignores the
-    /// node's current style, so replacing a block scalar with it leaves one
+    /// One line: plain when it reads back unchanged, else quoted as the
+    /// document's [`Quotes`] say, with `\n` escapes for line breaks. It
+    /// ignores the node's current style, so what it writes depends only on
+    /// the text and the document, and replacing a block scalar leaves one
     /// line.
     Line,
+}
+
+/// Which quotes a one-line string gets when it cannot be plain. A document
+/// sets it once, with [`Document::with_quotes`](crate::Document::with_quotes),
+/// and every writer follows it. Every variant writes plain text when it reads
+/// back unchanged, and double quotes for a character only they can carry,
+/// such as a control character or a line break. A replaced node that is
+/// already quoted keeps its quotes under [`TextStyle::Auto`].
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Quotes {
+    /// yamled chooses, in this order:
+    ///
+    /// 1. Plain, when the text reads back as itself unquoted.
+    /// 2. Single quotes, when the text holds no `'`.
+    /// 3. Double quotes, when it holds `'` and no `"`, so it is never written
+    ///    with a doubled `''`.
+    /// 4. Holding both, the form with fewer escapes; a tie goes to single.
+    /// 5. Double quotes for a character only they can carry, whatever the steps
+    ///    above chose.
+    #[default]
+    Auto,
+    /// Single quotes when the text cannot be plain.
+    Single,
+    /// Double quotes when the text cannot be plain.
+    Double,
+}
+
+impl Quotes {
+    /// The quotes `value` gets when it cannot be plain.
+    fn style(self, value: &str) -> Style {
+        let prefers_single = match self {
+            Self::Auto => {
+                !value.contains('\'')
+                    || (value.contains('"') && single(value).len() <= double(value).len())
+            }
+            Self::Single => true,
+            Self::Double => false,
+        };
+        if prefers_single && !value.chars().any(double_only) {
+            Style::SingleQuoted
+        } else {
+            Style::DoubleQuoted
+        }
+    }
+}
+
+/// A character a single-quoted scalar cannot hold on one line: a line break
+/// or another non-printable character. A tab is printable to YAML.
+fn double_only(c: char) -> bool {
+    c != '\t' && (c.is_control() || matches!(c, '\u{2028}' | '\u{2029}' | '\u{feff}'))
 }
 
 /// What a value looks like before it is placed, relative to column 0.
@@ -174,6 +226,7 @@ pub(crate) fn value<T: Serialize + ?Sized>(
     value: &T,
     preferred: Option<Style>,
     compact: bool,
+    quotes: Quotes,
 ) -> Result<Rendered, Error> {
     let yaml = serialize(value, compact)?;
     let index = Index::build(&yaml)?;
@@ -192,7 +245,7 @@ pub(crate) fn value<T: Serialize + ?Sized>(
         | Style::DoubleQuoted
         | Style::Literal
         | Style::Folded => match read_string(&yaml) {
-            Some(decoded) => text(&decoded, TextStyle::Auto, preferred),
+            Some(decoded) => text(&decoded, TextStyle::Auto, quotes, preferred),
             None => Ok(Rendered::inline(yaml.trim())),
         },
     }
@@ -200,7 +253,10 @@ pub(crate) fn value<T: Serialize + ?Sized>(
 
 /// The items of a value that serializes to a sequence of scalars that each
 /// fit on one line, written for a flow sequence; `None` for any other value.
-pub(crate) fn flow_items<T: Serialize + ?Sized>(value: &T) -> Result<Option<Vec<String>>, Error> {
+pub(crate) fn flow_items<T: Serialize + ?Sized>(
+    value: &T,
+    quotes: Quotes,
+) -> Result<Option<Vec<String>>, Error> {
     let yaml = serialize(value, false)?;
     let index = Index::build(&yaml)?;
     let Some(root) = index.nodes.first() else {
@@ -216,9 +272,9 @@ pub(crate) fn flow_items<T: Serialize + ?Sized>(value: &T) -> Result<Option<Vec<
                 let item = match node.style {
                     Style::Plain | Style::SingleQuoted | Style::DoubleQuoted => {
                         match read_string(written) {
-                            Some(decoded) => text(&decoded, TextStyle::Auto, None)?
+                            Some(decoded) => text(&decoded, TextStyle::Auto, quotes, None)?
                                 .inline_head()
-                                .map(flow_safe),
+                                .map(|head| flow_safe(head, quotes)),
                             None => Some(written.to_owned()),
                         }
                     }
@@ -260,28 +316,28 @@ fn serialize<T: Serialize + ?Sized>(value: &T, compact: bool) -> Result<String, 
 }
 
 /// A scalar as it may appear inside `[...]` or `{...}`, where `,`, `[`, `]`,
-/// `{`, and `}` end a plain scalar. A plain head holding one is quoted;
-/// quoted heads and nested flow collections pass through.
-pub(crate) fn flow_safe(head: &str) -> String {
+/// `{`, and `}` end a plain scalar. A plain head holding one is quoted as
+/// `quotes` says; quoted heads and nested flow collections pass through.
+pub(crate) fn flow_safe(head: &str, quotes: Quotes) -> String {
     if head.starts_with(['\'', '"', '[', '{']) || !head.contains([',', '[', ']', '{', '}']) {
-        head.to_owned()
-    } else if head.contains('\'') {
-        format!("\"{}\"", escape(head))
+        return head.to_owned();
+    }
+    if quotes.style(head) == Style::SingleQuoted {
+        single(head)
     } else {
-        format!("'{head}'")
+        double(head)
     }
 }
 
 /// Write a string in the first style that reads back as the same string:
-/// the caller's `style`, then the node's current style, then the automatic
-/// order. The automatic order skips single quotes for text with an
-/// apostrophe and no double quote, as [`flow_safe`] does, because `''` reads
-/// worse than `"`; text holding both keeps single quotes, which need no
-/// backslash. [`TextStyle::Line`] skips the node's style and the literal
-/// block, so only one-line styles remain.
+/// the caller's `style`, then the node's current style, then a literal
+/// block for text with line breaks, then plain, then the quotes `quotes`
+/// picks, then double quotes, which hold any string. [`TextStyle::Line`] skips
+/// the node's style and the literal block, so only one-line styles remain.
 pub(crate) fn text(
     value: &str,
     style: TextStyle,
+    quotes: Quotes,
     preferred: Option<Style>,
 ) -> Result<Rendered, Error> {
     let requested = match style {
@@ -292,14 +348,12 @@ pub(crate) fn text(
     let blocks = style != TextStyle::Line;
     let preferred = preferred.filter(|style| blocks && style.is_scalar());
     let multiline = (blocks && value.contains(LF)).then_some(Style::Literal);
-    let single = (!value.contains('\'') || value.contains('"')).then_some(Style::SingleQuoted);
     requested
         .into_iter()
         .chain(preferred)
         .chain(multiline)
         .chain([Style::Plain])
-        .chain(single)
-        .chain([Style::DoubleQuoted])
+        .chain([quotes.style(value), Style::DoubleQuoted])
         .filter_map(|candidate| scalar(value, candidate))
         .find(|rendered| reads_back(rendered, value))
         .ok_or_else(|| Error::Serialize {
@@ -311,11 +365,8 @@ fn scalar(value: &str, style: Style) -> Option<Rendered> {
     let one_line = !value.contains(LF);
     match style {
         Style::Plain if one_line && !value.is_empty() => Some(Rendered::inline(value)),
-        Style::SingleQuoted if one_line => {
-            let quoted = format!("'{}'", value.replace('\'', "''"));
-            Some(Rendered::inline(quoted))
-        }
-        Style::DoubleQuoted => Some(Rendered::inline(format!("\"{}\"", escape(value)))),
+        Style::SingleQuoted if one_line => Some(Rendered::inline(single(value))),
+        Style::DoubleQuoted => Some(Rendered::inline(double(value))),
         Style::Folded if one_line && !value.is_empty() => Some(Rendered::Scalar {
             head: format!(">{}-", indicator(value)),
             body: vec![value.to_owned()],
@@ -358,6 +409,16 @@ fn literal(value: &str) -> Rendered {
 /// with a space; otherwise the parser finds it.
 fn indicator(value: &str) -> &'static str {
     if value.starts_with(' ') { "2" } else { "" }
+}
+
+/// `value` single-quoted, each apostrophe doubled.
+fn single(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "''"))
+}
+
+/// `value` double-quoted, with backslash escapes.
+fn double(value: &str) -> String {
+    format!("\"{}\"", escape(value))
 }
 
 fn escape(value: &str) -> String {

@@ -123,6 +123,8 @@ pub struct Document {
     index: Index,
     compact: bool,
     spacing: Spacing,
+    #[cfg(feature = "serde")]
+    quotes: crate::Quotes,
 }
 
 impl Document {
@@ -147,6 +149,8 @@ impl Document {
             index,
             compact,
             spacing: Spacing::default(),
+            #[cfg(feature = "serde")]
+            quotes: crate::Quotes::default(),
         })
     }
 
@@ -154,6 +158,14 @@ impl Document {
     #[must_use]
     pub fn with_spacing(mut self, spacing: Spacing) -> Self {
         self.spacing = spacing;
+        self
+    }
+
+    /// Quote every string this document writes as `quotes` says.
+    #[cfg(feature = "serde")]
+    #[must_use]
+    pub fn with_quotes(mut self, quotes: crate::Quotes) -> Self {
+        self.quotes = quotes;
         self
     }
 

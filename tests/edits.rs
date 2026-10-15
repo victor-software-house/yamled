@@ -2,9 +2,9 @@
 
 use std::collections::BTreeMap;
 
-use indoc::indoc;
+use indoc::{formatdoc, indoc};
 use serde::Serialize;
-use yamled::{Document, Error, Path, Position, Segment, Spacing, TextStyle};
+use yamled::{Document, Error, Path, Position, Quotes, Segment, Spacing, TextStyle};
 
 const LEDGER: &str = include_str!("fixtures/ledger.yaml");
 
@@ -101,6 +101,87 @@ fn automatic_text_with_an_apostrophe_avoids_a_doubled_quote() {
           - it's plain
     "#};
     assert_eq!(document.as_str(), expected);
+}
+
+/// Each step of [`Quotes::Auto`]'s order, then what `Single` and `Double`
+/// change, each as the one line an item is written as.
+#[test]
+fn quotes_follow_their_order() {
+    let cases = [
+        (Quotes::Auto, "plain text", "plain text"),
+        (Quotes::Auto, "a: b", "'a: b'"),
+        (Quotes::Auto, r"it's: C:\dir", r#""it's: C:\\dir""#),
+        (Quotes::Auto, r#"it's "x": y"#, r#"'it''s "x": y'"#),
+        (Quotes::Auto, r#"it's 'odd': "x""#, r#""it's 'odd': \"x\"""#),
+        (Quotes::Auto, "a\u{1}: b", r#""a\u0001: b""#),
+        (Quotes::Auto, "tab\there: b", "'tab\there: b'"),
+        (Quotes::Single, "plain text", "plain text"),
+        (Quotes::Single, "it's: here", "'it''s: here'"),
+        (Quotes::Single, "a\u{1}: b", r#""a\u0001: b""#),
+        (Quotes::Double, "plain text", "plain text"),
+        (Quotes::Double, "a: b", r#""a: b""#),
+    ];
+    for (quotes, text, line) in cases {
+        let mut document = doc(indoc! {"
+            notes:
+              - first
+        "})
+        .with_quotes(quotes);
+        document
+            .push_text(&root().key("notes"), text, TextStyle::Line)
+            .unwrap();
+        let expected = formatdoc! {"
+            notes:
+              - first
+              - {line}
+        "};
+        assert_eq!(document.as_str(), expected, "{quotes:?} {text:?}");
+    }
+}
+
+#[test]
+fn a_document_quotes_every_writer_as_its_quotes_say() {
+    let source = indoc! {"
+        notes:
+          - first
+        tags: [a]
+    "};
+    let written = |quotes| {
+        let mut document = doc(source).with_quotes(quotes);
+        let notes = root().key("notes");
+        document.push(&notes, "it's: here").unwrap();
+        document
+            .replace(&root().key("tags"), &["it's, flow", "a, b"])
+            .unwrap();
+        document.as_str().to_owned()
+    };
+    assert_eq!(
+        written(Quotes::Auto),
+        indoc! {r#"
+            notes:
+              - first
+              - "it's: here"
+            tags: ["it's, flow", 'a, b']
+        "#}
+    );
+    assert_eq!(
+        written(Quotes::Single),
+        indoc! {"
+            notes:
+              - first
+              - 'it''s: here'
+            tags: ['it''s, flow', 'a, b']
+        "}
+    );
+    assert_eq!(
+        written(Quotes::Double),
+        indoc! {r#"
+            notes:
+              - first
+              - "it's: here"
+            tags: ["it's, flow", "a, b"]
+        "#}
+    );
 }
 
 #[test]

@@ -36,13 +36,13 @@ impl Document {
         let id = self.id(path)?;
         let node = &self.index.nodes[id];
         if node.style == Style::FlowSequence
-            && let Some(items) = render::flow_items(value)?
+            && let Some(items) = render::flow_items(value, self.quotes)?
         {
             let range = node.value.clone();
             let text = self.flow_text(id, &items);
             return self.commit_splice(range.start, range.end, &text);
         }
-        let rendered = render::value(value, Some(node.style), self.compact)?;
+        let rendered = render::value(value, Some(node.style), self.compact, self.quotes)?;
         self.splice_value(path, id, &rendered)
     }
 
@@ -53,7 +53,7 @@ impl Document {
     /// As [`Document::replace`].
     pub fn replace_text(&mut self, path: &Path, text: &str, style: TextStyle) -> Result<(), Error> {
         let id = self.id(path)?;
-        let rendered = render::text(text, style, Some(self.index.nodes[id].style))?;
+        let rendered = render::text(text, style, self.quotes, Some(self.index.nodes[id].style))?;
         self.splice_value(path, id, &rendered)
     }
 
@@ -71,7 +71,7 @@ impl Document {
         value: &T,
         position: Position<'_>,
     ) -> Result<(), Error> {
-        let rendered = render::value(value, None, self.compact)?;
+        let rendered = render::value(value, None, self.compact, self.quotes)?;
         self.insert_rendered(path, key, &rendered, position)
     }
 
@@ -88,7 +88,7 @@ impl Document {
         style: TextStyle,
         position: Position<'_>,
     ) -> Result<(), Error> {
-        let rendered = render::text(text, style, None)?;
+        let rendered = render::text(text, style, self.quotes, None)?;
         self.insert_rendered(path, key, &rendered, position)
     }
 
@@ -105,7 +105,7 @@ impl Document {
         index: usize,
         value: &T,
     ) -> Result<(), Error> {
-        let rendered = render::value(value, None, self.compact)?;
+        let rendered = render::value(value, None, self.compact, self.quotes)?;
         self.put_rendered(path, index, &rendered)
     }
 
@@ -121,7 +121,7 @@ impl Document {
         text: &str,
         style: TextStyle,
     ) -> Result<(), Error> {
-        let rendered = render::text(text, style, None)?;
+        let rendered = render::text(text, style, self.quotes, None)?;
         self.put_rendered(path, index, &rendered)
     }
 
@@ -132,7 +132,7 @@ impl Document {
     ///
     /// As [`Document::put`], and [`Error::Serialize`].
     pub fn push<T: Serialize + ?Sized>(&mut self, path: &Path, value: &T) -> Result<(), Error> {
-        let rendered = render::value(value, None, self.compact)?;
+        let rendered = render::value(value, None, self.compact, self.quotes)?;
         self.put_rendered(path, self.length(path), &rendered)
     }
 
@@ -142,7 +142,7 @@ impl Document {
     ///
     /// As [`Document::push`].
     pub fn push_text(&mut self, path: &Path, text: &str, style: TextStyle) -> Result<(), Error> {
-        let rendered = render::text(text, style, None)?;
+        let rendered = render::text(text, style, self.quotes, None)?;
         self.put_rendered(path, self.length(path), &rendered)
     }
 
@@ -222,7 +222,7 @@ impl Document {
                     &properties_before(&self.source, value.start),
                     rendered,
                 )?;
-                let head = render::flow_safe(head);
+                let head = render::flow_safe(head, self.quotes);
                 self.commit_splice(value.start, value.end, &head)
             }
             Some(_) => Err(Error::Unsupported {
@@ -356,7 +356,7 @@ impl Document {
                 path: path.clone().key(key),
             });
         }
-        let key_text = render::text(key, TextStyle::Auto, None)?;
+        let key_text = render::text(key, TextStyle::Auto, self.quotes, None)?;
         let key_text = key_text.inline_head().ok_or_else(|| Error::Serialize {
             message: format!("the key {key:?} needs more than one line"),
         })?;
