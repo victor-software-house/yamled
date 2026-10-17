@@ -1,5 +1,10 @@
 # Changelog
 
+## yamled 0.0.8
+
+- `TextStyle::Line` now ignores the quotes a replaced scalar already has, as its documentation says: `'It''s here: now'` replaced in one-line style under `Quotes::Auto` reads `"It's here: now"`, and a needlessly quoted `"demo"` reads `demo`.
+`TextStyle::Auto` still keeps a quoted scalar's quotes ([#37](https://github.com/victor-software-house/yamled/pull/37)).
+
 ## yamled 0.0.7
 
 - New `Quotes`, set per document with `Document::with_quotes`, chooses the quotes every writer uses. `Quotes::Auto`, the default, writes plain text when it reads back, then single quotes for text without an apostrophe, then double quotes for text with an apostrophe and no double quote, then the form with fewer escapes. So an apostrophe is never written as a doubled single quote. `Quotes::Single` and `Quotes::Double` pick one style. A scalar already quoted keeps its quotes on replace.
