@@ -46,7 +46,7 @@
 //! | Feature | Adds | Depends on |
 //! |:--|:--|:--|
 //! | (none) | The location index, [`remove`], [`take`], [`put`], [`reorder`], [`reindent`] | `granit-parser` |
-//! | `serde` (default) | [`replace`], [`insert`], [`push`], [`insert_item`], their `_text` forms, [`TextStyle`], [`Quotes`] | `serde`, `serde-saphyr` |
+//! | `serde` (default) | `replace`, `insert`, `push`, `insert_item`, their `_text` forms, `TextStyle`, `Quotes` | `serde`, `serde-saphyr` |
 //!
 //! A caller that needs only the line and column of a path, such as a schema
 //! error reporter, depends on `yamled` with `default-features = false`.
@@ -58,10 +58,6 @@
 //! [`put`]: Document::put
 //! [`reorder`]: Document::reorder
 //! [`reindent`]: Document::reindent
-//! [`replace`]: Document::replace
-//! [`insert`]: Document::insert
-//! [`push`]: Document::push
-//! [`insert_item`]: Document::insert_item
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
