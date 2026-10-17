@@ -1,5 +1,9 @@
 # Changelog
 
+## yamled 0.0.9
+
+- The docs.rs page opens with a quick start, says what a failed edit leaves behind, and lists what each Cargo feature adds, with each feature-gated item marked. docs.rs builds the page with rustdoc warnings capped, so a new nightly lint no longer fails the build ([#38](https://github.com/victor-software-house/yamled/pull/38)).
+
 ## yamled 0.0.8
 
 - `TextStyle::Line` now ignores the quotes a replaced scalar already has, as its documentation says: `'It''s here: now'` replaced in one-line style under `Quotes::Auto` reads `"It's here: now"`, and a needlessly quoted `"demo"` reads `demo`.
