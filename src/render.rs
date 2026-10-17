@@ -11,12 +11,20 @@ use crate::Error;
 use crate::index::{Index, Style};
 use crate::text::{LF, indent, join, spaced, terminated};
 
-/// How a string should be written when the caller has a preference.
+mod scan;
+#[cfg(test)]
+mod tests;
+
+use scan::Scan;
+
+/// The layout a string is written in: block or one line. Which quotes a
+/// one-line string gets is the document's [`Quotes`], not this.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum TextStyle {
-    /// Plain when it reads back unchanged, else single-quoted, else
-    /// double-quoted; a string with line breaks tries a literal block first.
+    /// The node's current style when it can hold the text, then a literal
+    /// block for text with line breaks, then one line as [`Self::Line`]
+    /// writes it.
     #[default]
     Auto,
     /// A folded block, `>-`, for one long line. Falls back to [`Self::Auto`]
@@ -24,6 +32,77 @@ pub enum TextStyle {
     Folded,
     /// A literal block, `|-`, which keeps every line break.
     Literal,
+    /// One line: plain when it reads back unchanged, else quoted as the
+    /// document's [`Quotes`] say, with `\n` escapes for line breaks. It
+    /// ignores the node's current style, so what it writes depends only on
+    /// the text and the document, and replacing a block scalar leaves one
+    /// line.
+    Line,
+}
+
+/// Which quotes a one-line string gets when it cannot be plain. A document
+/// sets it once, with [`Document::with_quotes`](crate::Document::with_quotes),
+/// and every writer follows it. Every variant writes plain text when it reads
+/// back unchanged, and double quotes for a character only they can carry,
+/// such as a control character or a line break. A replaced node that is
+/// already quoted keeps its quotes under [`TextStyle::Auto`].
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Quotes {
+    /// yamled chooses, in this order:
+    ///
+    /// 1. Plain, when the text reads back as itself unquoted.
+    /// 2. Single quotes, when the text holds no `'`.
+    /// 3. Double quotes, when it holds `'` and no `"`, so it is never written
+    ///    with a doubled `''`.
+    /// 4. Holding both, the form with fewer escapes; a tie goes to single.
+    /// 5. Double quotes for a character only they can carry, whatever the steps
+    ///    above chose.
+    #[default]
+    Auto,
+    /// Single quotes when the text cannot be plain.
+    Single,
+    /// Double quotes when the text cannot be plain.
+    Double,
+}
+
+impl Quotes {
+    /// The quotes a string with these counts gets when it cannot be plain.
+    fn style(self, scan: Scan) -> Style {
+        let prefers_single = match self {
+            Self::Auto => {
+                scan.apostrophes == 0
+                    || (scan.quotes > 0 && scan.apostrophes <= scan.quotes + scan.backslashes)
+            }
+            Self::Single => true,
+            Self::Double => false,
+        };
+        if prefers_single && !scan.double_only() {
+            Style::SingleQuoted
+        } else {
+            Style::DoubleQuoted
+        }
+    }
+}
+
+/// Where a scalar is written: as a block value, or inside `[...]` or
+/// `{...}`, where `,`, `[`, `]`, `{`, and `}` also end a plain scalar and no
+/// block scalar fits.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Context {
+    Block,
+    Flow,
+}
+
+/// A character a single-quoted or plain scalar cannot hold on one line: a
+/// line break or another non-printable character. A tab is printable to
+/// YAML.
+fn double_only(c: char) -> bool {
+    (c != '\t' && c.is_control())
+        || matches!(
+            c,
+            '\u{2028}' | '\u{2029}' | '\u{feff}' | '\u{fffe}' | '\u{ffff}'
+        )
 }
 
 /// What a value looks like before it is placed, relative to column 0.
@@ -167,6 +246,8 @@ pub(crate) fn value<T: Serialize + ?Sized>(
     value: &T,
     preferred: Option<Style>,
     compact: bool,
+    quotes: Quotes,
+    context: Context,
 ) -> Result<Rendered, Error> {
     let yaml = serialize(value, compact)?;
     let index = Index::build(&yaml)?;
@@ -185,7 +266,7 @@ pub(crate) fn value<T: Serialize + ?Sized>(
         | Style::DoubleQuoted
         | Style::Literal
         | Style::Folded => match read_string(&yaml) {
-            Some(decoded) => text(&decoded, TextStyle::Auto, preferred),
+            Some(decoded) => text(&decoded, TextStyle::Auto, quotes, preferred, context),
             None => Ok(Rendered::inline(yaml.trim())),
         },
     }
@@ -193,7 +274,10 @@ pub(crate) fn value<T: Serialize + ?Sized>(
 
 /// The items of a value that serializes to a sequence of scalars that each
 /// fit on one line, written for a flow sequence; `None` for any other value.
-pub(crate) fn flow_items<T: Serialize + ?Sized>(value: &T) -> Result<Option<Vec<String>>, Error> {
+pub(crate) fn flow_items<T: Serialize + ?Sized>(
+    value: &T,
+    quotes: Quotes,
+) -> Result<Option<Vec<String>>, Error> {
     let yaml = serialize(value, false)?;
     let index = Index::build(&yaml)?;
     let Some(root) = index.nodes.first() else {
@@ -209,9 +293,11 @@ pub(crate) fn flow_items<T: Serialize + ?Sized>(value: &T) -> Result<Option<Vec<
                 let item = match node.style {
                     Style::Plain | Style::SingleQuoted | Style::DoubleQuoted => {
                         match read_string(written) {
-                            Some(decoded) => text(&decoded, TextStyle::Auto, None)?
-                                .inline_head()
-                                .map(flow_safe),
+                            Some(decoded) => {
+                                text(&decoded, TextStyle::Line, quotes, None, Context::Flow)?
+                                    .inline_head()
+                                    .map(str::to_owned)
+                            }
                             None => Some(written.to_owned()),
                         }
                     }
@@ -252,61 +338,106 @@ fn serialize<T: Serialize + ?Sized>(value: &T, compact: bool) -> Result<String, 
     })
 }
 
-/// A scalar as it may appear inside `[...]` or `{...}`, where `,`, `[`, `]`,
-/// `{`, and `}` end a plain scalar. A plain head holding one is quoted;
-/// quoted heads and nested flow collections pass through.
-pub(crate) fn flow_safe(head: &str) -> String {
-    if head.starts_with(['\'', '"', '[', '{']) || !head.contains([',', '[', ']', '{', '}']) {
-        head.to_owned()
-    } else if head.contains('\'') {
-        format!("\"{}\"", escape(head))
-    } else {
-        format!("'{head}'")
-    }
-}
-
-/// Write a string in the first style that reads back as the same string:
-/// the caller's `style`, then the node's current style, then the automatic
-/// order.
+/// Write a string in the first style that holds it: the caller's `style`,
+/// then the node's current style, then a literal block for text with line
+/// breaks, then plain, then the quotes `quotes` picks, then double quotes,
+/// which hold any string. [`TextStyle::Line`] and a flow `context` skip the
+/// block styles, so only one-line styles remain.
+///
+/// One pass over the bytes decides which styles hold the string, by the
+/// reader's own rules, so nothing is parsed. A debug build parses every
+/// candidate it weighs and asserts the reader agrees.
 pub(crate) fn text(
     value: &str,
     style: TextStyle,
+    quotes: Quotes,
     preferred: Option<Style>,
+    context: Context,
 ) -> Result<Rendered, Error> {
+    let blocks = style != TextStyle::Line && context == Context::Block;
     let requested = match style {
-        TextStyle::Auto => None,
+        TextStyle::Auto | TextStyle::Line => None,
         TextStyle::Folded => Some(Style::Folded),
         TextStyle::Literal => Some(Style::Literal),
     };
-    let multiline = value.contains(LF).then_some(Style::Literal);
+    let block = |style: &Style| blocks || !matches!(style, Style::Literal | Style::Folded);
+    let preferred = preferred.filter(|style| style.is_scalar() && block(style));
+    let multiline = (blocks && value.contains(LF)).then_some(Style::Literal);
+    let scan = Scan::of(value, context);
     requested
+        .filter(block)
         .into_iter()
-        .chain(preferred.filter(|style| style.is_scalar()))
+        .chain(preferred)
         .chain(multiline)
-        .chain([Style::Plain, Style::SingleQuoted, Style::DoubleQuoted])
-        .filter_map(|candidate| scalar(value, candidate))
-        .find(|rendered| reads_back(rendered, value))
+        .chain([Style::Plain, quotes.style(scan), Style::DoubleQuoted])
+        .find_map(|candidate| written(value, candidate, scan, context))
         .ok_or_else(|| Error::Serialize {
             message: "no scalar style reads back as this string".to_owned(),
         })
 }
 
-fn scalar(value: &str, style: Style) -> Option<Rendered> {
+/// The one line every writer writes for `value` in a block or flow context.
+#[must_use]
+pub fn line(value: &str, quotes: Quotes, flow: bool) -> String {
+    let context = if flow { Context::Flow } else { Context::Block };
+    text(value, TextStyle::Line, quotes, None, context)
+        .ok()
+        .and_then(|rendered| rendered.inline_head().map(str::to_owned))
+        .unwrap_or_default()
+}
+
+/// `value` in `style` when the scan says that style holds it.
+fn written(value: &str, style: Style, scan: Scan, context: Context) -> Option<Rendered> {
+    let holds = match style {
+        Style::Plain => scan.plain,
+        Style::SingleQuoted => !scan.double_only(),
+        Style::DoubleQuoted => true,
+        Style::Literal => scan.literal,
+        Style::Folded => scan.folded,
+        Style::Alias
+        | Style::BlockSequence
+        | Style::FlowSequence
+        | Style::BlockMapping
+        | Style::FlowMapping => false,
+    };
+    debug_assert_eq!(
+        holds,
+        proven(value, style, context),
+        "{style:?} in {context:?} for {value:?}"
+    );
+    if !holds {
+        return None;
+    }
+    laid_out(value, style)
+}
+
+/// Whether the reader reads `value` written in `style` back as itself. Only
+/// double quotes may carry a character [`double_only`] names, and a block
+/// scalar may carry a line break. The oracle for the debug assertion in
+/// [`written`] and for the tests.
+fn proven(value: &str, style: Style, context: Context) -> bool {
+    let escaped = |c: char| double_only(c) && !(style == Style::Literal && c == LF);
+    let carried = style == Style::DoubleQuoted || !value.chars().any(escaped);
+    let block = matches!(style, Style::Literal | Style::Folded);
+    carried
+        && !(block && context == Context::Flow)
+        && laid_out(value, style).is_some_and(|rendered| reads_back(&rendered, value, context))
+}
+
+/// `value` laid out in `style`, when that layout can carry it at all: plain
+/// and folded text on one line, and no block scalar for empty text.
+fn laid_out(value: &str, style: Style) -> Option<Rendered> {
     let one_line = !value.contains(LF);
     match style {
         Style::Plain if one_line && !value.is_empty() => Some(Rendered::inline(value)),
-        Style::SingleQuoted if one_line => {
-            let quoted = format!("'{}'", value.replace('\'', "''"));
-            Some(Rendered::inline(quoted))
-        }
-        Style::DoubleQuoted => Some(Rendered::inline(format!("\"{}\"", escape(value)))),
+        Style::SingleQuoted => Some(Rendered::inline(single(value))),
+        Style::DoubleQuoted => Some(Rendered::inline(double(value))),
         Style::Folded if one_line && !value.is_empty() => Some(Rendered::Scalar {
             head: format!(">{}-", indicator(value)),
             body: vec![value.to_owned()],
         }),
         Style::Literal if !value.is_empty() => Some(literal(value)),
         Style::Plain
-        | Style::SingleQuoted
         | Style::Literal
         | Style::Folded
         | Style::Alias
@@ -344,6 +475,16 @@ fn indicator(value: &str) -> &'static str {
     if value.starts_with(' ') { "2" } else { "" }
 }
 
+/// `value` single-quoted, each apostrophe doubled.
+fn single(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "''"))
+}
+
+/// `value` double-quoted, with backslash escapes.
+fn double(value: &str) -> String {
+    format!("\"{}\"", escape(value))
+}
+
 fn escape(value: &str) -> String {
     let mut out = String::with_capacity(value.len());
     for c in value.chars() {
@@ -354,7 +495,7 @@ fn escape(value: &str) -> String {
             '\t' => out.push_str(r"\t"),
             '\r' => out.push_str(r"\r"),
             '\0' => out.push_str(r"\0"),
-            c if c.is_control() || matches!(c, '\u{85}' | '\u{2028}' | '\u{2029}' | '\u{feff}') => {
+            c if double_only(c) => {
                 // Writing to a String cannot fail.
                 let _ = write!(out, r"\u{:04X}", u32::from(c));
             }
@@ -373,16 +514,30 @@ fn reader() -> serde_saphyr::Options {
 
 /// Whether the family's reader reads the rendered text back as this exact
 /// string. A plain `true`, `4`, or `null` reads as another type and fails.
-fn reads_back(rendered: &Rendered, expected: &str) -> bool {
-    let probe = terminated(&format!("v:{}", rendered.after_key(0, false)));
-    serde_saphyr::from_str_with_options::<BTreeMap<String, Captured>>(&probe, reader()).is_ok_and(
-        |map| {
-            map.len() == 1
-                && map
-                    .get("v")
-                    .is_some_and(|value| matches!(value, Captured::Text(text) if text == expected))
-        },
-    )
+fn reads_back(rendered: &Rendered, expected: &str, context: Context) -> bool {
+    match context {
+        Context::Block => {
+            let probe = terminated(&format!("v:{}", rendered.after_key(0, false)));
+            serde_saphyr::from_str_with_options::<BTreeMap<String, Captured>>(&probe, reader())
+                .is_ok_and(|map| {
+                    map.len() == 1
+                        && map.get("v").is_some_and(
+                            |value| matches!(value, Captured::Text(text) if text == expected),
+                        )
+                })
+        }
+        Context::Flow => rendered.inline_head().is_some_and(|head| {
+            let probe = terminated(&format!("v: [{head}]"));
+            serde_saphyr::from_str_with_options::<BTreeMap<String, Vec<Captured>>>(&probe, reader())
+                .is_ok_and(|map| {
+                    map.len() == 1
+                        && matches!(
+                            map.get("v").map(Vec::as_slice),
+                            Some([Captured::Text(text)]) if text == expected
+                        )
+                })
+        }),
+    }
 }
 
 /// The string a serialized scalar holds, or `None` when it reads as another

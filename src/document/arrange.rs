@@ -106,9 +106,16 @@ impl Document {
     ///
     /// [`Error::NoNode`], [`Error::WrongKind`] when the path is not a block
     /// collection, [`Error::Unsupported`] for a collection that starts on its
-    /// parent's line, and [`Error::Invalid`] when the shifted text does not
-    /// parse or parses as a different structure.
+    /// parent's line or for a call inside a [`Document::batch`], and
+    /// [`Error::Invalid`] when the shifted text does not parse or parses as
+    /// a different structure.
     pub fn reindent(&mut self, path: &Path, column: usize) -> Result<(), Error> {
+        if self.pending.is_some() {
+            return Err(Error::Unsupported {
+                path: path.clone(),
+                what: "reindent inside a batch",
+            });
+        }
         let id = self.block_collection(path)?;
         let children = &self.index.nodes[id].children;
         let (Some(&first), Some(&last)) = (children.first(), children.last()) else {

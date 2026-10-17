@@ -7,7 +7,7 @@ use serde::Serialize;
 
 use super::{Document, Fragment};
 use crate::index::Style;
-use crate::render::{self, Rendered, TextStyle};
+use crate::render::{self, Context, Rendered, TextStyle};
 use crate::text::{LF, NEWLINE, column, comment_start, line_end, line_start, spaced, starts_line};
 use crate::{Error, Path};
 
@@ -36,13 +36,19 @@ impl Document {
         let id = self.id(path)?;
         let node = &self.index.nodes[id];
         if node.style == Style::FlowSequence
-            && let Some(items) = render::flow_items(value)?
+            && let Some(items) = render::flow_items(value, self.quotes)?
         {
             let range = node.value.clone();
             let text = self.flow_text(id, &items);
             return self.commit_splice(range.start, range.end, &text);
         }
-        let rendered = render::value(value, Some(node.style), self.compact)?;
+        let rendered = render::value(
+            value,
+            Some(node.style),
+            self.compact,
+            self.quotes,
+            self.context(id),
+        )?;
         self.splice_value(path, id, &rendered)
     }
 
@@ -53,7 +59,13 @@ impl Document {
     /// As [`Document::replace`].
     pub fn replace_text(&mut self, path: &Path, text: &str, style: TextStyle) -> Result<(), Error> {
         let id = self.id(path)?;
-        let rendered = render::text(text, style, Some(self.index.nodes[id].style))?;
+        let rendered = render::text(
+            text,
+            style,
+            self.quotes,
+            Some(self.index.nodes[id].style),
+            self.context(id),
+        )?;
         self.splice_value(path, id, &rendered)
     }
 
@@ -71,7 +83,7 @@ impl Document {
         value: &T,
         position: Position<'_>,
     ) -> Result<(), Error> {
-        let rendered = render::value(value, None, self.compact)?;
+        let rendered = render::value(value, None, self.compact, self.quotes, Context::Block)?;
         self.insert_rendered(path, key, &rendered, position)
     }
 
@@ -88,7 +100,7 @@ impl Document {
         style: TextStyle,
         position: Position<'_>,
     ) -> Result<(), Error> {
-        let rendered = render::text(text, style, None)?;
+        let rendered = render::text(text, style, self.quotes, None, Context::Block)?;
         self.insert_rendered(path, key, &rendered, position)
     }
 
@@ -105,7 +117,7 @@ impl Document {
         index: usize,
         value: &T,
     ) -> Result<(), Error> {
-        let rendered = render::value(value, None, self.compact)?;
+        let rendered = render::value(value, None, self.compact, self.quotes, Context::Block)?;
         self.put_rendered(path, index, &rendered)
     }
 
@@ -121,7 +133,7 @@ impl Document {
         text: &str,
         style: TextStyle,
     ) -> Result<(), Error> {
-        let rendered = render::text(text, style, None)?;
+        let rendered = render::text(text, style, self.quotes, None, Context::Block)?;
         self.put_rendered(path, index, &rendered)
     }
 
@@ -132,7 +144,7 @@ impl Document {
     ///
     /// As [`Document::put`], and [`Error::Serialize`].
     pub fn push<T: Serialize + ?Sized>(&mut self, path: &Path, value: &T) -> Result<(), Error> {
-        let rendered = render::value(value, None, self.compact)?;
+        let rendered = render::value(value, None, self.compact, self.quotes, Context::Block)?;
         self.put_rendered(path, self.length(path), &rendered)
     }
 
@@ -142,7 +154,7 @@ impl Document {
     ///
     /// As [`Document::push`].
     pub fn push_text(&mut self, path: &Path, text: &str, style: TextStyle) -> Result<(), Error> {
-        let rendered = render::text(text, style, None)?;
+        let rendered = render::text(text, style, self.quotes, None, Context::Block)?;
         self.put_rendered(path, self.length(path), &rendered)
     }
 
@@ -222,8 +234,7 @@ impl Document {
                     &properties_before(&self.source, value.start),
                     rendered,
                 )?;
-                let head = render::flow_safe(head);
-                self.commit_splice(value.start, value.end, &head)
+                self.commit_splice(value.start, value.end, head)
             }
             Some(_) => Err(Error::Unsupported {
                 path: path.clone(),
@@ -336,7 +347,35 @@ impl Document {
         }
     }
 
+    /// Insert an entry, refusing a key that an earlier insert in the same
+    /// batch already added to this mapping.
     fn insert_rendered(
+        &mut self,
+        path: &Path,
+        key: &str,
+        rendered: &Rendered,
+        position: Position<'_>,
+    ) -> Result<(), Error> {
+        let id = self.id(path)?;
+        let inserted = |pending: &super::Pending| {
+            pending
+                .keys
+                .iter()
+                .any(|(mapping, name)| *mapping == id && name == key)
+        };
+        if self.pending.as_ref().is_some_and(inserted) {
+            return Err(Error::KeyExists {
+                path: path.clone().key(key),
+            });
+        }
+        self.insert_entry(path, key, rendered, position)?;
+        if let Some(pending) = &mut self.pending {
+            pending.keys.push((id, key.to_owned()));
+        }
+        Ok(())
+    }
+
+    fn insert_entry(
         &mut self,
         path: &Path,
         key: &str,
@@ -356,7 +395,7 @@ impl Document {
                 path: path.clone().key(key),
             });
         }
-        let key_text = render::text(key, TextStyle::Auto, None)?;
+        let key_text = render::text(key, TextStyle::Auto, self.quotes, None, Context::Block)?;
         let key_text = key_text.inline_head().ok_or_else(|| Error::Serialize {
             message: format!("the key {key:?} needs more than one line"),
         })?;
@@ -409,6 +448,27 @@ impl Document {
             text: format!("- {}{LF}", rendered.after_dash(0)),
         };
         self.put(path, index, &fragment)
+    }
+
+    /// Whether the node is written inside a flow collection.
+    fn context(&self, id: usize) -> Context {
+        match self.index.nodes[id]
+            .parent
+            .map(|parent| self.index.nodes[parent].style)
+        {
+            Some(Style::FlowSequence | Style::FlowMapping) => Context::Flow,
+            Some(
+                Style::BlockSequence
+                | Style::BlockMapping
+                | Style::Plain
+                | Style::SingleQuoted
+                | Style::DoubleQuoted
+                | Style::Literal
+                | Style::Folded
+                | Style::Alias,
+            )
+            | None => Context::Block,
+        }
     }
 
     /// How many items the node at a path holds, or 0 when there is none; a

@@ -49,16 +49,19 @@ default = ["serde"]
 serde = ["dep:serde", "dep:serde-saphyr"]
 
 [dependencies]
-granit-parser = "1.3.0"
+granit-parser = "2.0.0"
 serde = { version = "1.0.228", default-features = false, features = [
   "std",
 ], optional = true }
-serde-saphyr = { version = "1.3.0", default-features = false, features = [
+serde-saphyr = { version = "2.0.0", default-features = false, features = [
   "serialize",
   "deserialize",
 ], optional = true }
 
 [dev-dependencies]
+criterion = { version = "0.8.2", default-features = false, features = [
+  "cargo_bench_support",
+] }
 indoc = "2.0.7"
 insta = { version = "1.48.0", default-features = false }
 proptest = { version = "1.11.0", default-features = false, features = ["std"] }
@@ -82,6 +85,11 @@ required-features = ["serde"]
 
 [[test]]
 name = "properties"
+required-features = ["serde"]
+
+[[bench]]
+name = "render"
+harness = false
 required-features = ["serde"]
 
 [package.metadata.docs.rs]

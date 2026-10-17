@@ -2,9 +2,9 @@
 
 use std::collections::BTreeMap;
 
-use indoc::indoc;
+use indoc::{formatdoc, indoc};
 use serde::Serialize;
-use yamled::{Document, Error, Path, Position, Segment, Spacing, TextStyle};
+use yamled::{Document, Error, Path, Position, Quotes, Segment, Spacing, TextStyle};
 
 const LEDGER: &str = include_str!("fixtures/ledger.yaml");
 
@@ -57,6 +57,332 @@ fn a_plain_title_that_now_needs_quoting_is_quoted_once() {
         - id: A-1
           title: 'A new title: with a colon'
     "};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
+fn a_title_with_an_apostrophe_is_double_quoted_unless_already_single_quoted() {
+    let mut document = doc(indoc! {"
+        - title: Old
+        - title: 'Old: one'
+    "});
+    document
+        .replace(&root().index(0).key("title"), "It's done: mostly")
+        .unwrap();
+    document
+        .replace(&root().index(1).key("title"), "It's done: mostly")
+        .unwrap();
+    let expected = indoc! {r#"
+        - title: "It's done: mostly"
+        - title: 'It''s done: mostly'
+    "#};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
+fn automatic_text_with_an_apostrophe_avoids_a_doubled_quote() {
+    let mut document = doc(indoc! {"
+        notes:
+          - first
+    "});
+    let notes = root().key("notes");
+    document
+        .push_text(&notes, "2026-10-15: it's here", TextStyle::Auto)
+        .unwrap();
+    document
+        .push_text(&notes, r#"it's "quoted": here"#, TextStyle::Auto)
+        .unwrap();
+    document.push(&notes, "it's plain").unwrap();
+    let expected = indoc! {r#"
+        notes:
+          - first
+          - "2026-10-15: it's here"
+          - 'it''s "quoted": here'
+          - it's plain
+    "#};
+    assert_eq!(document.as_str(), expected);
+}
+
+/// Each step of [`Quotes::Auto`]'s order, then what `Single` and `Double`
+/// change, each as the one line an item is written as.
+#[test]
+fn quotes_follow_their_order() {
+    let cases = [
+        (Quotes::Auto, "plain text", "plain text"),
+        (Quotes::Auto, "a: b", "'a: b'"),
+        (Quotes::Auto, r"it's: C:\dir", r#""it's: C:\\dir""#),
+        (Quotes::Auto, r#"it's "x": y"#, r#"'it''s "x": y'"#),
+        (Quotes::Auto, r#"it's 'odd': "x""#, r#""it's 'odd': \"x\"""#),
+        (Quotes::Auto, "a\u{1}: b", r#""a\u0001: b""#),
+        (Quotes::Auto, "tab\there: b", "'tab\there: b'"),
+        (Quotes::Single, "plain text", "plain text"),
+        (Quotes::Single, "it's: here", "'it''s: here'"),
+        (Quotes::Single, "a\u{1}: b", r#""a\u0001: b""#),
+        (Quotes::Double, "plain text", "plain text"),
+        (Quotes::Double, "a: b", r#""a: b""#),
+    ];
+    for (quotes, text, line) in cases {
+        let mut document = doc(indoc! {"
+            notes:
+              - first
+        "})
+        .with_quotes(quotes);
+        document
+            .push_text(&root().key("notes"), text, TextStyle::Line)
+            .unwrap();
+        let expected = formatdoc! {"
+            notes:
+              - first
+              - {line}
+        "};
+        assert_eq!(document.as_str(), expected, "{quotes:?} {text:?}");
+    }
+}
+
+#[test]
+fn a_document_quotes_every_writer_as_its_quotes_say() {
+    let source = indoc! {"
+        notes:
+          - first
+        tags: [a]
+    "};
+    let written = |quotes| {
+        let mut document = doc(source).with_quotes(quotes);
+        let notes = root().key("notes");
+        document.push(&notes, "it's: here").unwrap();
+        document
+            .replace(&root().key("tags"), &["it's, flow", "a, b"])
+            .unwrap();
+        document.as_str().to_owned()
+    };
+    assert_eq!(
+        written(Quotes::Auto),
+        indoc! {r#"
+            notes:
+              - first
+              - "it's: here"
+            tags: ["it's, flow", 'a, b']
+        "#}
+    );
+    assert_eq!(
+        written(Quotes::Single),
+        indoc! {"
+            notes:
+              - first
+              - 'it''s: here'
+            tags: ['it''s, flow', 'a, b']
+        "}
+    );
+    assert_eq!(
+        written(Quotes::Double),
+        indoc! {r#"
+            notes:
+              - first
+              - "it's: here"
+            tags: ["it's, flow", "a, b"]
+        "#}
+    );
+}
+
+#[test]
+fn a_flow_item_is_quoted_by_the_flow_rule() {
+    let mut document = doc(indoc! {"
+        tags: [a, b, c]
+    "});
+    let tags = root().key("tags");
+    document
+        .replace_text(&tags.clone().index(0), "x, y", TextStyle::Auto)
+        .unwrap();
+    document
+        .replace_text(&tags.clone().index(1), "it's [z]", TextStyle::Folded)
+        .unwrap();
+    document
+        .replace_text(&tags.clone().index(2), "a: b", TextStyle::Line)
+        .unwrap();
+    assert_eq!(
+        document.as_str(),
+        indoc! {r#"
+            tags: ['x, y', "it's [z]", 'a: b']
+        "#}
+    );
+}
+
+/// Every path in a batch names the text the batch began with, so the second
+/// replace still finds the item the inserts land before.
+#[test]
+fn a_batch_applies_its_edits_to_the_text_it_began_with() {
+    let source = indoc! {"
+        notes:
+          - >-
+            first: folded
+          - |-
+            one
+            two
+        tail: kept
+    "};
+    let mut document = doc(source);
+    let notes = root().key("notes");
+    document
+        .batch(|batch| {
+            batch.replace_text(&notes.clone().index(0), "first: folded", TextStyle::Line)?;
+            batch.replace_text(&notes.clone().index(1), "one", TextStyle::Line)?;
+            batch.insert_item_text(&notes, 2, "two", TextStyle::Line)?;
+            batch.insert_item_text(&notes, 2, "three", TextStyle::Line)?;
+            batch.replace_text(&root().key("tail"), "kept", TextStyle::Line)?;
+            assert_eq!(batch.as_str(), source);
+            Ok::<(), Error>(())
+        })
+        .unwrap();
+    assert_eq!(
+        document.as_str(),
+        indoc! {"
+            notes:
+              - 'first: folded'
+              - one
+              - two
+              - three
+            tail: kept
+        "}
+    );
+}
+
+#[test]
+fn a_failed_batch_leaves_the_text_unchanged() {
+    let source = indoc! {"
+        notes:
+          - first
+          - second
+    "};
+    let mut document = doc(source);
+    let first = root().key("notes").index(0);
+    let overlapping = document.batch(|batch| {
+        batch.replace_text(&first, "one", TextStyle::Line)?;
+        batch.replace_text(&first, "two", TextStyle::Line)
+    });
+    assert!(
+        matches!(overlapping, Err(Error::Unsupported { .. })),
+        "{overlapping:?}"
+    );
+    assert_eq!(document.as_str(), source);
+    let failed = document.batch(|batch| {
+        batch.replace_text(&first, "one", TextStyle::Line)?;
+        batch.replace_text(&root().key("missing"), "x", TextStyle::Line)
+    });
+    assert!(failed.is_err());
+    assert_eq!(document.as_str(), source);
+}
+
+/// A caller's own error, which a batch converts yamled's errors into.
+#[derive(Debug)]
+enum Failure {
+    Yaml(Error),
+    Domain,
+}
+
+impl From<Error> for Failure {
+    fn from(error: Error) -> Self {
+        Self::Yaml(error)
+    }
+}
+
+#[test]
+fn a_batch_returns_the_callers_error_and_keeps_the_text() {
+    let source = indoc! {"
+        notes:
+          - first
+    "};
+    let mut document = doc(source);
+    let failed = document.batch(|batch| {
+        batch.replace_text(&root().key("notes").index(0), "one", TextStyle::Line)?;
+        Err::<(), Failure>(Failure::Domain)
+    });
+    assert!(matches!(failed, Err(Failure::Domain)), "{failed:?}");
+    assert_eq!(document.as_str(), source);
+    let missing = document.batch(|batch| {
+        batch.replace_text(&root().key("missing"), "x", TextStyle::Line)?;
+        Ok::<(), Failure>(())
+    });
+    assert!(
+        matches!(missing, Err(Failure::Yaml(Error::NoNode { .. }))),
+        "{missing:?}"
+    );
+}
+
+#[test]
+fn a_batch_refuses_what_its_starting_text_cannot_prove() {
+    let source = indoc! {"
+        row:
+          title: t
+        list:
+          - a
+    "};
+    let mut document = doc(source);
+    let row = root().key("row");
+    let twice = document.batch(|batch| {
+        batch.insert(&row, "scope", "s", Position::End)?;
+        batch.insert(&row, "scope", "s", Position::End)
+    });
+    assert!(matches!(twice, Err(Error::KeyExists { .. })), "{twice:?}");
+    assert_eq!(document.as_str(), source);
+    let reindent = document.batch(|batch| batch.reindent(&root().key("list"), 4));
+    assert!(
+        matches!(reindent, Err(Error::Unsupported { .. })),
+        "{reindent:?}"
+    );
+    assert_eq!(document.as_str(), source);
+}
+
+#[test]
+fn a_noncharacter_is_escaped_inside_double_quotes() {
+    let mut document = doc(indoc! {"
+        notes:
+          - first
+    "});
+    document
+        .push_text(&root().key("notes"), "a\u{fffe}b", TextStyle::Line)
+        .unwrap();
+    assert_eq!(
+        document.as_str(),
+        indoc! {r#"
+            notes:
+              - first
+              - "a\uFFFEb"
+        "#}
+    );
+}
+
+#[test]
+fn line_style_turns_a_block_item_into_one_line() {
+    let mut document = doc(indoc! {"
+        notes:
+          - >2-
+            2026-09-28: a folded note
+          - |-
+            first
+            second
+          - kept
+    "});
+    let notes = root().key("notes");
+    document
+        .replace_text(
+            &notes.clone().index(0),
+            "2026-09-28: a folded note",
+            TextStyle::Line,
+        )
+        .unwrap();
+    document
+        .replace_text(&notes.clone().index(1), "first\nsecond", TextStyle::Line)
+        .unwrap();
+    document
+        .insert_item_text(&notes, 2, "it's: inserted", TextStyle::Line)
+        .unwrap();
+    let expected = indoc! {r#"
+        notes:
+          - '2026-09-28: a folded note'
+          - "first\nsecond"
+          - "it's: inserted"
+          - kept
+    "#};
     assert_eq!(document.as_str(), expected);
 }
 
