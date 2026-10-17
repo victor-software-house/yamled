@@ -108,8 +108,9 @@ at `tests/yaml-test-suite`, pinned to a commit of its `data` branch.
 The repository setup comes from the shared Copier template, the private
 `victor-software-house/templates` repository (kind `rust-crate`): the whole
 files `.miserc.toml`, `.envrc`, `mise.dev.toml`, `mise.ci.toml`,
-`lefthook.yml`, `committed.toml`, `mise-tasks/hooks.toml`,
-`mise-tasks/commit-msg`, `mise-tasks/commits`, `rust-toolchain.toml`,
+`lefthook.yml`, `committed.toml`, the shared `.sh` tasks in `mise-tasks/`
+(`hooks/`, `commit-msg.sh`, `commits.sh`, `check/repo.sh`, `format/`,
+`lint/`, `specs.sh`), `rust-toolchain.toml`,
 `rustfmt.toml`, `clippy.toml`, and `deny.toml`, plus the settings,
 toolchain, and `[task_config]` blocks of `mise.toml` and the `[lints]` tables
 of `Cargo.toml`.
