@@ -387,6 +387,30 @@ fn line_style_turns_a_block_item_into_one_line() {
 }
 
 #[test]
+fn line_style_ignores_the_quotes_a_scalar_has() {
+    let mut document = doc(indoc! {r#"
+        title: 'It''s here: now'
+        scope: "demo"
+        stamp: '2026-08-19T10:00:00'
+    "#});
+    for (key, text) in [
+        ("title", "It's here: now"),
+        ("scope", "demo"),
+        ("stamp", "2026-08-19T10:00:00"),
+    ] {
+        document
+            .replace_text(&root().key(key), text, TextStyle::Line)
+            .unwrap();
+    }
+    let expected = indoc! {r#"
+        title: "It's here: now"
+        scope: demo
+        stamp: 2026-08-19T10:00:00
+    "#};
+    assert_eq!(document.as_str(), expected);
+}
+
+#[test]
 fn a_quoted_scalar_stays_quoted_and_a_folded_one_stays_folded() {
     let mut document = doc(indoc! {r#"
         title: "Old"

@@ -342,7 +342,9 @@ fn serialize<T: Serialize + ?Sized>(value: &T, compact: bool) -> Result<String, 
 /// then the node's current style, then a literal block for text with line
 /// breaks, then plain, then the quotes `quotes` picks, then double quotes,
 /// which hold any string. [`TextStyle::Line`] and a flow `context` skip the
-/// block styles, so only one-line styles remain.
+/// block styles, so only one-line styles remain. [`TextStyle::Line`] also
+/// skips the node's current style, so a quoted node takes the quotes the
+/// document's `quotes` give.
 ///
 /// One pass over the bytes decides which styles hold the string, by the
 /// reader's own rules, so nothing is parsed. A debug build parses every
@@ -361,7 +363,8 @@ pub(crate) fn text(
         TextStyle::Literal => Some(Style::Literal),
     };
     let block = |style: &Style| blocks || !matches!(style, Style::Literal | Style::Folded);
-    let preferred = preferred.filter(|style| style.is_scalar() && block(style));
+    let preferred = preferred
+        .filter(|candidate| style != TextStyle::Line && candidate.is_scalar() && block(candidate));
     let multiline = (blocks && value.contains(LF)).then_some(Style::Literal);
     let scan = Scan::of(value, context);
     requested
