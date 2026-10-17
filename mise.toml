@@ -46,7 +46,7 @@ bun = "1.4.2"
 includes = [
   # Pinned git:: catalogs follow mise-tasks.
   "mise-tasks",
-  "git::https://github.com/victor-software-house/qctl.git//tasks/q?ref=v0.4.4",
+  "git::https://github.com/victor-software-house/qctl.git//tasks/q?ref=v0.5.9",
   # The standard Rust tasks, verify included, shared from ctl-core. Bump the
   # ref together with the rust pins above.
   "git::https://github.com/victor-software-house/ctl-core.git//tasks/rust.toml?ref=v0.6.20",
