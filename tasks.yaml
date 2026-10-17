@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://github.com/victor-software-house/qctl/releases/download/v0.4.4/tasks.schema.json
+# yaml-language-server: $schema=https://github.com/victor-software-house/qctl/releases/download/v0.5.9/tasks.schema.json
 schema_version: 4
 prefix: YMD
 active: YMD-010
@@ -25,12 +25,9 @@ queue:
       - Every preference writes plain text that reads back, and double quotes for a character only they can carry.
       - A scalar already quoted keeps its quotes on replace with TextStyle::Auto.
     notes:
-      - >2-
-        2026-10-15, qctl QCTL-039 needs it: qctl writes every list item through TextStyle::Auto, and render::text tries plain, then single-quoted, then double-quoted, so a note such as "it's: here" becomes 'it''s: here'. flow_safe already prefers double quotes for an apostrophe.
-      - >2-
-        2026-10-15, TextStyle::Line added for the same qctl row: qctl fmt rewrites block list items in place, and replace_text with Auto keeps the node's block style, while a remove and insert would drop the item's comments.
-      - >2-
-        2026-10-15, reworked on review: the apostrophe rule was hardcoded inside TextStyle::Auto and again in flow_safe. Quoting is now a per-document Quotes setting with an explicit order, and TextStyle is layout only.
+      - "2026-10-15, qctl QCTL-039 needs it: qctl writes every list item through TextStyle::Auto, and render::text tries plain, then single-quoted, then double-quoted, so a note such as \"it's: here\" becomes 'it''s: here'. flow_safe already prefers double quotes for an apostrophe."
+      - "2026-10-15, TextStyle::Line added for the same qctl row: qctl fmt rewrites block list items in place, and replace_text with Auto keeps the node's block style, while a remove and insert would drop the item's comments."
+      - '2026-10-15, reworked on review: the apostrophe rule was hardcoded inside TextStyle::Auto and again in flow_safe. Quoting is now a per-document Quotes setting with an explicit order, and TextStyle is layout only.'
 archive:
   - id: YMD-009
     title: Take template v0.0.4 and its task layout
@@ -47,7 +44,7 @@ archive:
     outcome: yamled renders its repository setup and Rust configuration from the shared Copier template at a recorded tag, and CI fails when the template has a newer tag.
     completed: 2026-10-12T01:20:00
     evidence:
-      - 'Merged in https://github.com/victor-software-house/yamled/pull/22 (a10bae3) at template v0.0.3: on a fresh build runner mise install armed the hooks, a commit ran pre-commit and commit-msg, MISE_ENV=ci installed no hooks, and verify passed; CI Verify and Template passed, Template through ctl-core''s composite action.'
+      - "Merged in https://github.com/victor-software-house/yamled/pull/22 (a10bae3) at template v0.0.3: on a fresh build runner mise install armed the hooks, a commit ran pre-commit and commit-msg, MISE_ENV=ci installed no hooks, and verify passed; CI Verify and Template passed, Template through ctl-core's composite action."
     disposition: completed
 
   - id: YMD-007
@@ -56,7 +53,7 @@ archive:
     outcome: yamled's verify is ctl-core's shared verify, and yamled's own checks run through check:repo, so a task added to the shared verify reaches yamled.
     completed: 2026-10-11T23:15:00
     evidence:
-      - 'Merged in https://github.com/victor-software-house/yamled/pull/21 (377bbb3): verify on a fresh build runner without system node, in the pre-push hook, and in CI, Kody review clean. Planned in ctl-core''s OpenSpec change repo-checks.'
+      - "Merged in https://github.com/victor-software-house/yamled/pull/21 (377bbb3): verify on a fresh build runner without system node, in the pre-push hook, and in CI, Kody review clean. Planned in ctl-core's OpenSpec change repo-checks."
     disposition: completed
 
   - id: YMD-006
@@ -65,7 +62,7 @@ archive:
     outcome: yamled builds, lints, and tests on Rust 1.99.0 through ctl-core's shared tasks, so a fix to a shared task reaches yamled by a ref bump.
     completed: 2026-10-11T22:48:38
     evidence:
-      - 'Released as yamled 0.0.6 (https://crates.io/crates/yamled/0.0.6) from https://github.com/victor-software-house/yamled/pull/19: verify on a fresh build runner, in the pre-push hook, and in CI, Kody review clean. Planned in ctl-core''s OpenSpec change shared-rust-tasks.'
+      - "Released as yamled 0.0.6 (https://crates.io/crates/yamled/0.0.6) from https://github.com/victor-software-house/yamled/pull/19: verify on a fresh build runner, in the pre-push hook, and in CI, Kody review clean. Planned in ctl-core's OpenSpec change shared-rust-tasks."
     disposition: completed
 
   - id: YMD-005
@@ -105,11 +102,10 @@ archive:
     plan: openspec/changes/archive/2026-09-28-formatter-edits/proposal.md
     completed: 2026-09-29T02:25:01
     evidence:
-      - 'Released as yamled 0.0.2 (https://crates.io/crates/yamled/0.0.2) from https://github.com/victor-software-house/yamled/pull/4, with whole-file tests in tests/workflows.rs; verify on the build host and in CI, Kody review clean.'
+      - Released as yamled 0.0.2 (https://crates.io/crates/yamled/0.0.2) from https://github.com/victor-software-house/yamled/pull/4, with whole-file tests in tests/workflows.rs; verify on the build host and in CI, Kody review clean.
     disposition: completed
     notes:
-      - >-
-        Found by mapping a work-queue tool's 33 accepted mutation snapshots onto yamled edits: 25 map onto the edits in YMD-001; these four do not. Whitespace tidying (trailing spaces, blank runs) stays in the tool.
+      - "Found by mapping a work-queue tool's 33 accepted mutation snapshots onto yamled edits: 25 map onto the edits in YMD-001; these four do not. Whitespace tidying (trailing spaces, blank runs) stays in the tool."
 
   - id: YMD-001
     title: Edit YAML in place through a location index
