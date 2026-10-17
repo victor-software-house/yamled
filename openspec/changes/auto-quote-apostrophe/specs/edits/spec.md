@@ -221,6 +221,13 @@ double-quoted.
 - **AND** the caller replaces it with the same text in one-line style
 - **THEN** the item reads `- "first\nsecond"`
 
+#### Scenario: A quoted scalar takes the document's quotes in one-line style
+
+- **WHEN** the row has `title: 'It''s here: now'` and `scope: "demo"` under
+  `Quotes::Auto`
+- **AND** the caller replaces each with its own text in one-line style
+- **THEN** the lines read `title: "It's here: now"` and `scope: demo`
+
 #### Scenario: A line separator is never written raw in a block
 
 - **WHEN** the caller pushes `a`, U+2028, and `b` with literal style
