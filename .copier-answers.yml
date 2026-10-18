@@ -11,7 +11,7 @@ deny_licenses:
 deny_skip: []
 feature_sets:
 - serde
-kind: rust-crate
+project: rust-crate
 layout: crate
 nightly_fmt: true
 openspec: true
