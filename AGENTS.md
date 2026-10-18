@@ -106,7 +106,7 @@ at `tests/yaml-test-suite`, pinned to a commit of its `data` branch.
 ## Copier template
 
 The repository setup comes from the shared Copier template, the private
-`victor-software-house/templates` repository (kind `rust-crate`): the whole
+`victor-software-house/templates` repository (project `rust-crate`): the whole
 files `.miserc.toml`, `.envrc`, `mise.dev.toml`, `mise.ci.toml`,
 `lefthook.yml`, `committed.toml`, the shared `.sh` tasks in `mise-tasks/`
 (`hooks/`, `commit-msg.sh`, `commits.sh`, `check/repo.sh`, `format/`,
