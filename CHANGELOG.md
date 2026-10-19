@@ -1,5 +1,9 @@
 # Changelog
 
+## yamled 0.0.10
+
+- Releases run through verctl's reusable release workflow at 0.5.1: each push to `main` publishes any version commit not yet fully released, and opens or updates the Version PR on `verctl/release/main`. `verify` gains ctl-core 0.6.27's `check:versions`, which fails a pull request that edits a manifest version by hand ([#44](https://github.com/victor-software-house/yamled/pull/44)).
+
 ## yamled 0.0.9
 
 - The docs.rs page opens with a quick start, says what a failed edit leaves behind, and lists what each Cargo feature adds, with each feature-gated item marked. docs.rs builds the page with rustdoc warnings capped, so a new nightly lint no longer fails the build ([#38](https://github.com/victor-software-house/yamled/pull/38)).
