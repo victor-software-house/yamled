@@ -20,7 +20,7 @@ locked = true
 rust = [
   # Pinned stable: build, lint, test.
   { version = "1.99.0", components = "clippy", mr_boxington = true },
-  # Formatting only, for rustfmt's unstable options.
+  # rustfmt's unstable options, and rustdoc as docs.rs builds it.
   { version = "nightly-2026-09-29", profile = "minimal", components = "rustfmt" },
 ]
 mr-boxington = "1.24.0"
@@ -39,6 +39,30 @@ node = "24.21.0"
 # The tools above come from the Copier template; the one below is yamled's.
 bun = "1.4.2"
 
+# The shared Rust tasks read their toolchains from here and name none.
+[env]
+# format runs rustfmt on the nightly, for its unstable options.
+RUSTFMT_TOOLCHAIN = "+nightly-2026-09-29"
+# doc builds on the nightly, as docs.rs does.
+RUST_NIGHTLY = "nightly-2026-09-29"
+
+# The one gate, composed from the pieces this repository keeps. deny:advisories
+# and semver need the network, so they run as their own CI steps.
+[tasks.verify]
+description = "Every offline check this repository runs"
+depends = [
+  "check:toolchain",
+  "format",
+  "lint",
+  "check:features",
+  "test",
+  "test:doc",
+  "doc",
+  "deny",
+  "deps",
+  "check:repo",
+]
+
 # mise-tasks/ holds this repository's task fragments and file tasks. An
 # includes list replaces the default task dirs, so mise-tasks comes first; add
 # pinned git:: catalogs after it.
@@ -51,9 +75,10 @@ includes = [
   # workflow's pin.
   "git::https://github.com/victor-software-house/verctl.git//tasks/ver?ref=v0.5.1",
   "git::https://github.com/victor-software-house/qctl.git//tasks/q?ref=v0.5.9",
-  # The standard Rust tasks, verify included, shared from ctl-core. Bump the
-  # ref together with the rust pins above.
-  "git::https://github.com/victor-software-house/ctl-core.git//tasks/rust.toml?ref=v0.6.27",
+  # The shared Rust tasks, at actions main, 2026-10-19.
+  "git::https://github.com/victor-software-house/actions.git//tasks/rust.toml?ref=a373f0f3d1c4194c63023536c0d7cc80c116bba8",
+  # template:check, template:off, and template:on, at actions main, 2026-10-19.
+  "git::https://github.com/victor-software-house/actions.git//tasks/template.toml?ref=a373f0f3d1c4194c63023536c0d7cc80c116bba8",
 ]
 
 # The YAML test suite submodule: `mise run` and `mise x` check it out when

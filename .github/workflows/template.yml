@@ -1,0 +1,23 @@
+name: Template
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: template-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  # Fails when the newest template tag would change this repository. The
+  # shared workflow reads the template with the organization's reader App, so
+  # it takes the organization's secrets.
+  template:
+    uses: victor-software-house/actions/.github/workflows/template-check.yml@a373f0f3d1c4194c63023536c0d7cc80c116bba8 # main, 2026-10-19
+    with:
+      mise-version: 2026.10.9
+    secrets: inherit
