@@ -65,15 +65,18 @@ mise run verify
 
 1. Rust: the toolchain pin check, rustfmt, clippy (pedantic, denied) with all
    features and again with none, `cargo test` and the doc-tests, cargo-deny
-   licenses, bans, and sources, and cargo-machete.
-   These tasks come from ctl-core's `tasks/rust.toml`, which `mise.toml`
-   includes at a ctl-core release tag; change them there, not here.
-   `check:features` and `check:repo` live in `mise-tasks/check.toml`,
-   because they name this crate's feature sets and its other checks; the
-   shared `verify` depends on both.
+   licenses, bans, and sources, cargo-machete, and rustdoc on the dated
+   nightly with `-D warnings`, as docs.rs builds it.
+   These tasks come from the shared `tasks/rust.toml` of the actions
+   repository, which `mise.toml` includes by commit; the Copier template
+   moves that pin, so change the tasks there, not here. The template also
+   writes `verify` inline in `mise.toml`.
+   `check:features` lives in `mise-tasks/check/features.sh`, because it
+   names this crate's feature set; the template wrote it once and leaves it
+   to this repository.
    Build, lint, and test run on the pinned stable (1.99.0, also
-   `rust-version` and `rust-toolchain.toml`); rustfmt runs on the dated
-   nightly. Bump the include's ref and both pins together.
+   `rust-version` and `rust-toolchain.toml`); rustfmt and rustdoc run on the
+   dated nightly. Bump both pins together.
    Tests run under plain `cargo test`. Measured on Linux and macOS with
    doc-tests included, cargo-nextest was 1.05 to 14 times slower (it starts
    one process per test), and mbx test scheduling or a `RUST_TEST_THREADS`
@@ -138,12 +141,14 @@ fresh clone gets its git hooks from `mise install`. CI sets `MISE_ENV=ci`
 (`ci,release` for release jobs) and never loads `dev`, so no runner installs
 hooks.
 
-The CI job `Template` uses ctl-core's composite action
-`.github/actions/copier-check`, pinned by commit. It mints a token from the
-`vsh-templates-reader` GitHub App, installs only uv and python, and runs
-`copier update`. It fails when the newest tag changes a file besides
+The Template check, `.github/workflows/template.yml`, calls the shared
+`template-check.yml` of the actions repository by commit, which runs
+`mise run template:check` with a token from the `vsh-templates-reader`
+GitHub App. It fails when the newest tag changes a file besides
 `.copier-answers.yml`; a newer tag that renders the same files passes with a
-notice. The job is skipped for pull requests from forks.
+notice. The job is skipped for pull requests from forks. Run the same check
+locally with `mise run template:check`. Turn a template piece off with
+`mise run template:off <piece>`, which keeps its files.
 
 ## Features
 
