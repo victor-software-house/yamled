@@ -48,8 +48,12 @@ Multiline strings use `indoc!` and `formatdoc!`. No `concat!`, and no escaped
 A human writes `.changeset/*.md` on the same PR that ships the behaviour. Every
 changeset is a `patch` bump; do not write `minor` or `major` until the operator
 decides otherwise. Never hand-edit a version or `CHANGELOG.md`. Declarations
-live in [`.ctl/ver.yaml`](.ctl/ver.yaml); verctl opens the Version PR, and
-merging it publishes to crates.io.
+live in [`.ctl/ver.yaml`](.ctl/ver.yaml). `.github/workflows/release.yml` calls
+verctl's reusable release workflow on every push to `main`: it publishes each
+version commit not yet released to crates.io, then opens the Version PR on
+`verctl/release/main` with auto-merge. Bump its pin with the verctl pin in
+`mise.release.toml` and the `ver` include in `mise.toml`. `verify` runs
+`check:versions`, which fails a pull request that edits a version by hand.
 
 ## Checks
 
@@ -132,8 +136,7 @@ gitleaks. Every hook command runs with `MISE_ENV=dev,hooks`. Its
 `postinstall` hook runs `lefthook install` after every `mise install`, so a
 fresh clone gets its git hooks from `mise install`. CI sets `MISE_ENV=ci`
 (`ci,release` for release jobs) and never loads `dev`, so no runner installs
-hooks. The Version PR job installs only rust, mr-boxington, and verctl,
-because verctl's `prepare.after` runs `cargo update --workspace`.
+hooks.
 
 The CI job `Template` uses ctl-core's composite action
 `.github/actions/copier-check`, pinned by commit. It mints a token from the
