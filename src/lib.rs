@@ -58,6 +58,8 @@
 //! [`put`]: Document::put
 //! [`reorder`]: Document::reorder
 //! [`reindent`]: Document::reindent
+//!
+//! Temporary probe: one `unmatched backtick.
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
