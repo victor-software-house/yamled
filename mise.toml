@@ -37,7 +37,7 @@ actionlint = "1.7.12"
 node = "24.21.0"
 "npm:@fission-ai/openspec" = "1.14.1"
 # The tools above come from the Copier template; the one below is yamled's.
-bun = "1.4.2"
+bun = "1.4.4"
 
 # The shared Rust tasks read their toolchains from here and name none.
 [env]
