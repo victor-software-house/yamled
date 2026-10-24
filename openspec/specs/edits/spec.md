@@ -104,18 +104,18 @@ SHALL write a string in a caller-chosen layout, `TextStyle`: automatic, folded
 quotes of a one-line string SHALL come from the document's `Quotes`.
 Automatic layout SHALL keep the node's current style when it can hold the
 text, then try a literal block for text with a line break, then one line.
-One-line layout SHALL ignore the node's current style and never write a block
-scalar, so a block scalar it replaces becomes one line, and text with a line
-break is double-quoted with `\n` escapes. An indentation indicator SHALL be
-written only when the text starts with a space. A block scalar SHALL not hold
-a character only double quotes carry, such as U+2028; such text SHALL be
-double-quoted.
 
 #### Scenario: A dated note is folded without an indentation indicator
 
 - **WHEN** the caller pushes the text `2026-09-28: a dated note` with folded
   style
 - **THEN** the item reads `- >-` followed by the text on the next line
+
+### Requirement: One-line layout writes no block scalar
+
+One-line layout SHALL ignore the node's current style and never write a block
+scalar, so a block scalar it replaces becomes one line, and text with a line
+break is double-quoted with `\n` escapes.
 
 #### Scenario: A folded item becomes one line
 
@@ -135,6 +135,12 @@ double-quoted.
   `Quotes::Auto`
 - **AND** the caller replaces each with its own text in one-line style
 - **THEN** the lines read `title: "It's here: now"` and `scope: demo`
+
+### Requirement: A block scalar holds only what it can carry
+
+An indentation indicator SHALL be written only when the text starts with a
+space. A block scalar SHALL not hold a character only double quotes carry,
+such as U+2028; such text SHALL be double-quoted.
 
 #### Scenario: A line separator is never written raw in a block
 
