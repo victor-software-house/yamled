@@ -86,8 +86,8 @@ mise run verify
    (`.rumdl.toml`), typos for spelling, actionlint for workflows, and
    `openspec validate --all --strict`.
 
-mise pins every tool, OpenSpec included (`npm:@fission-ai/openspec`, installed
-through Bun and run on the pinned Node); do not use a global copy.
+mise pins every tool, OpenSpec included (`github:Fission-AI/OpenSpec`, its
+standalone release binary); do not use a global copy.
 Advisories run on CI only (`mise run deny:advisories`). The rust entry in
 `mise.toml` routes Cargo through mr-boxington (`mr_boxington = true`), locally
 and in CI, where `jdx/mr-boxington-action` restores the build cache.
