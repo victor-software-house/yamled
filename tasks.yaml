@@ -1,5 +1,5 @@
-# yaml-language-server: $schema=https://github.com/victor-software-house/qctl/releases/download/v0.5.9/tasks.schema.json
-schema_version: 4
+# yaml-language-server: $schema=https://github.com/victor-software-house/qctl/releases/download/v0.6.0/tasks.schema.json
+schema_version: 5
 prefix: YMD
 active: YMD-010
 queue:
@@ -12,23 +12,22 @@ queue:
       - copier update to v0.0.5 leaves no conflict marker, and mise.toml sets lockfile_platforms = ["linux-x64", "macos-arm64"].
       - Every lock is regenerated whole with mise lock --platform linux-x64,macos-arm64, and its linux-x64 and macos-arm64 entries match main.
       - On a fresh linux-x64 machine, mise install leaves git status clean, and mise run verify passes.
-
+archive:
   - id: YMD-011
     title: Let a document choose its quotes, and write one line on request
     scope: yamled writer
     outcome: A document's Quotes setting picks the quotes every writer uses, Quotes::Auto follows a documented order that never doubles a quote for an apostrophe, and TextStyle chooses layout only, with Line writing any string on one line.
-    blocked_by: []
-    acceptance:
-      - replace_text with TextStyle::Line turns a folded or literal item into one line that reads back as the same string.
-      - Document::with_quotes sets Auto, Single, or Double, and replace, insert, push, the text forms, and flow sequence items all follow it.
-      - Under Quotes::Auto, text needing quotes is single-quoted without an apostrophe, double-quoted with an apostrophe and no double quote, and otherwise takes the form with fewer escapes, ties to single.
-      - Every preference writes plain text that reads back, and double quotes for a character only they can carry.
-      - A scalar already quoted keeps its quotes on replace with TextStyle::Auto.
     notes:
       - "2026-10-15, qctl QCTL-039 needs it: qctl writes every list item through TextStyle::Auto, and render::text tries plain, then single-quoted, then double-quoted, so a note such as \"it's: here\" becomes 'it''s: here'. flow_safe already prefers double quotes for an apostrophe."
       - "2026-10-15, TextStyle::Line added for the same qctl row: qctl fmt rewrites block list items in place, and replace_text with Auto keeps the node's block style, while a remove and insert would drop the item's comments."
       - '2026-10-15, reworked on review: the apostrophe rule was hardcoded inside TextStyle::Auto and again in flow_safe. Quoting is now a per-document Quotes setting with an explicit order, and TextStyle is layout only.'
-archive:
+    plan: openspec/changes/archive/2026-10-24-auto-quote-apostrophe/proposal.md
+    completed: 2026-10-24T03:20:09
+    evidence:
+      - openspec/changes/archive/2026-10-24-auto-quote-apostrophe/
+      - Shipped in https://github.com/victor-software-house/yamled/pull/33, released as yamled 0.0.7 by https://github.com/victor-software-house/yamled/pull/35.
+    disposition: completed
+
   - id: YMD-009
     title: Take template v0.0.4 and its task layout
     scope: yamled
