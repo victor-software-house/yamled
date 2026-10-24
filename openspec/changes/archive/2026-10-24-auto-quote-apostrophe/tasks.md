@@ -27,6 +27,10 @@
     the 270 block items of the largest consumer ledger in 5.0 ms against
     830.7 ms one by one, at [75fe8c9]. Not yet done: the `qctl fmt` timing,
     which comes with the qctl change that uses the batch.
+  - 2026-10-24 UTC: the batch shipped in [PR 33][yamled#33], and qctl
+    calls it since [qctl PR 118][qctl#118]. The `qctl fmt` timing was
+    never recorded, so this box stays open; the change is archived
+    because YMD-011's acceptance is met.
 - [x] 1.6 Move serde-saphyr and granit-parser to 2.0.0 in their own
   commit. Verify `mise run verify` passes on the build host and the cost of
   one `reads_back` on the largest consumer ledger has not regressed.
@@ -67,3 +71,4 @@
 [75fe8c9]: https://github.com/victor-software-house/yamled/commit/75fe8c9686a85abc47247a54f429cd5d89260c59
 [yamled#33]: https://github.com/victor-software-house/yamled/pull/33
 [ci]: https://github.com/victor-software-house/yamled/actions/runs/38763501482
+[qctl#118]: https://github.com/victor-software-house/qctl/pull/118
