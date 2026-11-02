@@ -300,8 +300,11 @@ fn failure(op: &Op, why: &str, before: &str, after: &str) -> TestCaseError {
 
 fn check(ledger: &Ledger, ops: &[Op]) -> Result<(), TestCaseError> {
     let source = render(ledger);
-    let mut document = Document::parse(source.as_str())
-        .unwrap_or_else(|error| panic!("generated ledger does not parse: {error}\n{source}"));
+    let mut document = Document::parse(source.as_str()).map_err(|error| {
+        TestCaseError::fail(format!(
+            "generated ledger does not parse: {error}\n{source}"
+        ))
+    })?;
     let mut expected = model(ledger);
     if read(document.as_str()) != expected {
         return Err(TestCaseError::fail(format!(
@@ -329,7 +332,11 @@ fn check(ledger: &Ledger, ops: &[Op]) -> Result<(), TestCaseError> {
                 }
                 continue;
             }
-            Err(error) => panic!("{op:?} failed: {error}\n{before}"),
+            Err(error) => {
+                return Err(TestCaseError::fail(format!(
+                    "{op:?} failed: {error}\n{before}"
+                )));
+            }
         }
         let after = document.as_str();
         if read(after) != expected {
