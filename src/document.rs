@@ -616,6 +616,10 @@ impl Document {
         let text = dedent(&source[start..end], column(source, self.dash(id)));
         let siblings = &self.index.nodes[parent].children;
         if siblings.len() == 1 {
+            #[expect(
+                clippy::map_err_ignore,
+                reason = "a missing key is reported as the edit the document cannot do, which names the same path"
+            )]
             let (colon, _) = self.colon(path, parent).map_err(|_| Error::Unsupported {
                 path: path.clone(),
                 what: "take the only item of a sequence with no key",

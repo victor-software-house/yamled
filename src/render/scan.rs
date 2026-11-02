@@ -79,6 +79,10 @@ impl Scan {
 
 /// The bytes the pass acts on. Every other byte is ordinary text, skipped
 /// with one lookup.
+#[expect(
+    clippy::as_conversions,
+    reason = "`usize::from` is not const, and a byte always fits a `usize`"
+)]
 const NOTABLE: [bool; 256] = {
     let mut table = [false; 256];
     let mut byte = 0;

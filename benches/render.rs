@@ -62,7 +62,9 @@ fn benches(c: &mut Criterion) {
     let texts: Vec<&str> = items.iter().map(|(_, text)| text.as_str()).collect();
 
     let mut decide = c.benchmark_group("decide");
-    decide.throughput(Throughput::Elements(texts.len() as u64));
+    decide.throughput(Throughput::Elements(
+        u64::try_from(texts.len()).unwrap_or(u64::MAX),
+    ));
     for (name, flow) in [("block", false), ("flow", true)] {
         decide.bench_function(name, |b| {
             b.iter(|| {
@@ -78,7 +80,9 @@ fn benches(c: &mut Criterion) {
     let mut rewritten = document.clone();
     rewrite(&mut rewritten, &items).expect("rewrite the ledger");
     let mut ledger = c.benchmark_group("ledger");
-    ledger.throughput(Throughput::Elements(items.len() as u64));
+    ledger.throughput(Throughput::Elements(
+        u64::try_from(items.len()).unwrap_or(u64::MAX),
+    ));
     for (name, start) in [("rewrite", &document), ("unchanged", &rewritten)] {
         ledger.bench_function(name, |b| {
             b.iter_batched(
