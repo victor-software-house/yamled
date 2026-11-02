@@ -13,6 +13,17 @@ queue:
       - Every lock is regenerated whole with mise lock --platform linux-x64,macos-arm64, and its linux-x64 and macos-arm64 entries match main.
       - On a fresh linux-x64 machine, mise install leaves git status clean, and mise run verify passes.
 archive:
+  - id: YMD-012
+    title: Only the operator merges the Version PR
+    scope: .github/workflows/release.yml, AGENTS.md
+    outcome: "No yamled release happens on its own: the release workflow never arms auto-merge on the Version PR."
+    notes:
+      - Operator decision 2026-11-02, no repository releases on its own.
+    completed: 2026-11-02T17:30:43
+    evidence:
+      - This pull request drops auto-merge from release.yml and states in AGENTS.md that only the operator merges the Version PR.
+    disposition: completed
+
   - id: YMD-011
     title: Let a document choose its quotes, and write one line on request
     scope: yamled writer

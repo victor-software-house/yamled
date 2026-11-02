@@ -51,7 +51,8 @@ decides otherwise. Never hand-edit a version or `CHANGELOG.md`. Declarations
 live in [`.ctl/ver.yaml`](.ctl/ver.yaml). `.github/workflows/release.yml` calls
 verctl's reusable release workflow on every push to `main`: it publishes each
 version commit not yet released to crates.io, then opens the Version PR on
-`verctl/release/main` with auto-merge. Bump its pin with the verctl pin in
+`verctl/release/main`. Only the operator merges the Version PR, so no release
+happens on its own. Bump its pin with the verctl pin in
 `mise.release.toml` and the `ver` include in `mise.toml`. `verify` runs
 `check:versions`, which fails a pull request that edits a version by hand.
 
