@@ -155,8 +155,10 @@ locally with `mise run template:check`. Turn a template piece off with
 
 `serde` (default) adds the edits that write a value (`replace`, `insert`,
 `push`, `insert_item`, and their `_text` forms) and pulls `serde` and
-`serde-saphyr`. Without it the crate needs `granit-parser` alone: the location
-index, `remove`, `take`, `put`, `reorder`, and `reindent`. Anything new that
+`serde-saphyr`. serde-saphyr comes as the `vsh-serde-saphyr` package:
+2.1.1 with two patches, so deserializing never runs the snippet renderer.
+Without it the crate needs `granit-parser` alone: the location index,
+`remove`, `take`, `put`, `reorder`, and `reindent`. Anything new that
 needs a serializer goes under `serde`; `check:features` lints the crate
 without it. Dependencies are declared with the features the crate uses,
 default features off.

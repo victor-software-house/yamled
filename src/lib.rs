@@ -46,13 +46,19 @@
 //! | Feature | Adds | Depends on |
 //! |:--|:--|:--|
 //! | (none) | The location index, [`remove`], [`take`], [`put`], [`reorder`], [`reindent`] | `granit-parser` |
-//! | `serde` (default) | `replace`, `insert`, `push`, `insert_item`, their `_text` forms, `TextStyle`, `Quotes` | `serde`, `serde-saphyr` |
+//! | `serde` (default) | `replace`, `insert`, `push`, `insert_item`, their `_text` forms, `TextStyle`, `Quotes` | `serde`, `vsh-serde-saphyr` |
 //!
 //! A caller that needs only the line and column of a path, such as a schema
 //! error reporter, depends on `yamled` with `default-features = false`.
 //!
+//! [`vsh-serde-saphyr`] is serde-saphyr 2.1.1 with two patches, under the
+//! library name `serde_saphyr`. Its deserializer builds no error report
+//! through the snippet renderer, so a program that reads values through
+//! yamled does not link it.
+//!
 //! [`granit-parser`]: https://docs.rs/granit-parser
 //! [`serde-saphyr`]: https://docs.rs/serde-saphyr
+//! [`vsh-serde-saphyr`]: https://docs.rs/vsh-serde-saphyr
 //! [`remove`]: Document::remove
 //! [`take`]: Document::take
 //! [`put`]: Document::put
