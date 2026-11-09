@@ -4,7 +4,12 @@
 # The YAML test suite is upstream data, pinned as a submodule.
 # OpenSpec schema templates hold placeholders instead of Markdown to render,
 # so their links and anchors point nowhere yet.
-exclude = ["target/**", "CHANGELOG.md", "tests/yaml-test-suite/**", "openspec/schemas/**"]
+exclude = [
+  "target/**",
+  "CHANGELOG.md",
+  "tests/yaml-test-suite/**",
+  "openspec/schemas/**",
+]
 # Heading anchors (MD051), reference labels (MD052) and relative links to
 # files (MD057) must resolve. MD052 catches a full or collapsed reference
 # whose definition a tool dropped, such as [0011][d11].
