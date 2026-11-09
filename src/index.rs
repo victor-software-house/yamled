@@ -227,8 +227,8 @@ impl Builder {
         id
     }
 
-    /// A block collection ends at the end of its last value, not where the
-    /// parser reports, which is the start of the next token after any blank
+    /// A block collection ends at the end of its last value. The parser
+    /// reports a later end: the start of the next token after any blank
     /// lines and comments.
     fn finish(mut self) -> Index {
         for node in (0..self.nodes.len()).rev() {

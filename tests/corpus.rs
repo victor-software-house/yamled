@@ -1,7 +1,8 @@
 //! The public YAML test suite, pinned as the `tests/yaml-test-suite`
 //! submodule. Every input yamled parses survives a replace of each scalar
 //! with its own value: the edit keeps every byte outside that node and the
-//! document's value. Every input it refuses fails with an error, not a panic.
+//! document's value. Every input it refuses fails with an error instead of a
+//! panic.
 
 use std::fs;
 use std::path::PathBuf;

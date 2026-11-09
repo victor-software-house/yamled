@@ -1,6 +1,6 @@
 # yamled
 
-Format-preserving YAML edits for Rust. **A library, not a command.** Import
+Format-preserving YAML edits for Rust. **A library without a command.** Import
 as `yamled`.
 
 This repo's queue is [`tasks.yaml`](tasks.yaml) (`YMD-###`).
@@ -26,7 +26,7 @@ field means, and what a ledger forbids.
 ## Rules
 
 1. **Every byte an edit does not name stays as it was.** A test compares whole
-   files, not values alone.
+   files instead of values alone.
 2. **No edit leaves invalid YAML.** Each edit is proven by parsing the result
    back to the expected value.
 3. **A comment belongs to the node below it** when no blank line separates
@@ -70,7 +70,7 @@ mise run verify
    nightly with `-D warnings`, as docs.rs builds it.
    These tasks come from the shared `tasks/rust.toml` of the actions
    repository, which `mise.toml` includes by commit; the Copier template
-   moves that pin, so change the tasks there, not here. The template also
+   moves that pin, so change the tasks there instead of here. The template also
    writes `verify` inline in `mise.toml`.
    `check:features` lives in `mise-tasks/check/features.sh`, because it
    names this crate's feature set; the template wrote it once and leaves it
