@@ -55,6 +55,18 @@ fn invalid_yaml_is_refused_with_its_location() {
 }
 
 #[test]
+fn an_alias_to_an_unknown_anchor_is_refused() {
+    let source = indoc! {"
+        a: 1
+        b: *missing
+    "};
+    let Err(Error::Parse { line, .. }) = Document::parse(source) else {
+        panic!("expected a parse error");
+    };
+    assert_eq!(line, 2);
+}
+
+#[test]
 fn carriage_returns_and_several_documents_are_refused() {
     let windows = ["a: 1", "b: 2"].join("\r\n");
     assert!(matches!(

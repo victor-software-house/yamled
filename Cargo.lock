@@ -262,9 +262,9 @@ dependencies = [
 
 [[package]]
 name = "granit-parser"
-version = "2.0.0"
+version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da55feca5d1625466bae068f9fd4b87892caeae70c3fe671ddb0f50d41aebf37"
+checksum = "05f05586d4d4df3d47123207826c40b252728b438a1a07bad3c01ee6bea401df"
 dependencies = [
  "arraydeque",
  "smallvec",
@@ -543,23 +543,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde-saphyr"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a253edfdea34032da21af84e16fcc94f4c7a6ba237f9f3bc2dbf43cea8535c44"
-dependencies = [
- "annotate-snippets",
- "base64",
- "encoding_rs_io",
- "granit-parser",
- "nohash-hasher",
- "num-traits",
- "serde_core",
- "smallvec",
- "zmij",
-]
-
-[[package]]
 name = "serde_core"
 version = "1.0.229"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -686,6 +669,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4ac048d71ede7ee76d585517add45da530660ef4390e49b098733c6e897f254"
 
 [[package]]
+name = "vsh-serde-saphyr"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "20f99ed76a53d5be310e16fd7492a057bc871252aea6df4212a34e700ac7d9fd"
+dependencies = [
+ "annotate-snippets",
+ "base64",
+ "encoding_rs_io",
+ "granit-parser",
+ "nohash-hasher",
+ "num-traits",
+ "serde_core",
+ "smallvec",
+ "zmij",
+]
+
+[[package]]
 name = "walkdir"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -766,9 +766,9 @@ dependencies = [
  "insta",
  "proptest",
  "serde",
- "serde-saphyr",
  "serde_json",
  "similar 3.2.0",
+ "vsh-serde-saphyr",
 ]
 
 [[package]]
