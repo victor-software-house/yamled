@@ -114,6 +114,16 @@ struct Builder {
 }
 
 impl Builder {
+    /// Index one parser event.
+    ///
+    /// An unresolved alias is indexed as an alias. [`Index::build`] parses
+    /// with granit-parser's default options, which refuse an unknown alias
+    /// as a parse error, so the event arrives only if those options change.
+    /// It then occupies a node position, and granit-parser asks a consumer
+    /// to keep it as a node. An anchor event is metadata after the node it
+    /// names, which the index already holds. `Event` is non-exhaustive, so
+    /// the last arm takes a variant a later granit-parser adds; it carries
+    /// nothing the index tracks until this match names it.
     fn event(
         &mut self,
         source: &str,
@@ -140,7 +150,7 @@ impl Builder {
             Event::Scalar(text, style, _, _) => {
                 self.scalar(source, text.into_owned(), style, start, end);
             }
-            Event::Alias(_) => {
+            Event::Alias(_) | Event::UnresolvedAlias(_) => {
                 self.attach(Node::leaf(start..end, Style::Alias));
             }
             Event::SequenceStart(structure, ..) => self.open(false, structure, start),
@@ -152,7 +162,7 @@ impl Builder {
                     self.nodes[frame.node].value.end = end;
                 }
             }
-            Event::StreamStart | Event::StreamEnd | Event::DocumentEnd => {}
+            Event::StreamStart | Event::StreamEnd | Event::DocumentEnd | Event::Anchor(..) => {}
             #[expect(
                 clippy::match_same_arms,
                 reason = "Event is non-exhaustive; a later variant carries nothing this index tracks"
@@ -380,5 +390,33 @@ fn scalar_style(style: ScalarStyle) -> Style {
         ScalarStyle::Literal => Style::Literal,
         ScalarStyle::Folded => Style::Folded,
         ScalarStyle::Plain => Style::Plain,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::borrow::Cow;
+
+    use granit_parser::{Event, StructureStyle};
+
+    use super::{Builder, Style};
+
+    #[test]
+    fn an_unresolved_alias_is_indexed_as_an_alias() {
+        let source = "[*missing]";
+        let mut builder = Builder::default();
+        let events = [
+            (Event::SequenceStart(StructureStyle::Flow, 0, None), 0, 1),
+            (Event::UnresolvedAlias(Cow::Borrowed("missing")), 1, 9),
+            (Event::SequenceEnd, 9, 10),
+        ];
+        for (event, start, end) in events {
+            builder.event(source, event, start, end).unwrap();
+        }
+        let index = builder.finish();
+        let styles: Vec<Style> = index.nodes.iter().map(|node| node.style).collect();
+        assert_eq!(styles, [Style::FlowSequence, Style::Alias]);
+        assert_eq!(index.nodes[0].children, [1]);
+        assert_eq!(&source[index.nodes[1].value.clone()], "*missing");
     }
 }
