@@ -2,7 +2,24 @@
 [global]
 # A release tool writes CHANGELOG.md; nobody edits it by hand.
 # The YAML test suite is upstream data, pinned as a submodule.
-exclude = ["target/**", "CHANGELOG.md", "tests/yaml-test-suite/**"]
+# OpenSpec schema templates hold placeholders instead of Markdown to render,
+# so their links and anchors point nowhere yet.
+exclude = [
+  "target/**",
+  "CHANGELOG.md",
+  "tests/yaml-test-suite/**",
+  "openspec/schemas/**",
+]
+# Heading anchors (MD051), reference labels (MD052) and relative links to
+# files (MD057) must resolve. MD052 catches a full or collapsed reference
+# whose definition a tool dropped, such as [0011][d11].
+#
+# rumdl 0.3.2 skips a label of digits only ([0011][0011]) with no option to
+# check it. Such references need a label with a letter, such as d11.
+#
+# All three are in rumdl's default set. Naming them keeps them on if a later
+# release moves them to the opt-in rules.
+extend-enable = ["MD051", "MD052", "MD057"]
 
 [MD013]
 line-length = 80
@@ -14,5 +31,5 @@ tables = false
 ".changeset/*.md" = ["MD013", "MD041"]
 # A one-line import of AGENTS.md.
 "CLAUDE.md" = ["MD041"]
-# OpenSpec delta specs start with their operation heading, not a title.
+# OpenSpec delta specs start with their operation heading instead of a title.
 "openspec/changes/*/specs/**/spec.md" = ["MD041"]
