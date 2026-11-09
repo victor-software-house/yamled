@@ -17,8 +17,8 @@ mod tests;
 
 use scan::Scan;
 
-/// The layout a string is written in: block or one line. Which quotes a
-/// one-line string gets is the document's [`Quotes`], not this.
+/// The layout a string is written in: block or one line. The document's
+/// [`Quotes`] picks the quotes a one-line string gets.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum TextStyle {
