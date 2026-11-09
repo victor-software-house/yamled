@@ -1,5 +1,15 @@
 # Changelog
 
+## yamled 0.0.11
+
+- The `serde` feature takes serde-saphyr as vsh-serde-saphyr 0.0.2, under the same library name, `serde_saphyr`.
+That release is serde-saphyr 2.1.1 with two patches.
+
+Upstream serde-saphyr formats a whole error report while it deserializes, snippet renderer included.
+So every binary that read a value through yamled carried annotate-snippets.
+The patched release reads the error's kind instead, and builds an alias error's message from the plain text.
+A program that also depends on ctl-core now links one serde-saphyr instead of two ([#70](https://github.com/victor-software-house/yamled/pull/70)).
+
 ## yamled 0.0.10
 
 - Releases run through verctl's reusable release workflow at 0.5.1: each push to `main` publishes any version commit not yet fully released, and opens or updates the Version PR on `verctl/release/main`. `verify` gains ctl-core 0.6.27's `check:versions`, which fails a pull request that edits a manifest version by hand ([#44](https://github.com/victor-software-house/yamled/pull/44)).
