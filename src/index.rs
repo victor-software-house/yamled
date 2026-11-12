@@ -151,7 +151,12 @@ impl Builder {
                 self.scalar(source, text.into_owned(), style, start, end);
             }
             Event::Alias(_) | Event::UnresolvedAlias(_) => {
-                self.attach(Node::leaf(start..end, Style::Alias));
+                let alias = Node::leaf(start..end, Style::Alias);
+                if self.in_key_position() {
+                    self.detach_key(alias);
+                } else {
+                    self.attach(alias);
+                }
             }
             Event::SequenceStart(structure, ..) => self.open(false, structure, start),
             Event::MappingStart(structure, ..) => self.open(true, structure, start),
@@ -203,13 +208,37 @@ impl Builder {
             (false, true) => Style::FlowSequence,
             (false, false) => Style::BlockSequence,
         };
-        let node = self.attach(Node::leaf(start..start, style));
+        let leaf = Node::leaf(start..start, style);
+        let node = if self.in_key_position() {
+            self.detach_key(leaf)
+        } else {
+            self.attach(leaf)
+        };
         self.stack.push(Frame {
             node,
             pending_key: None,
             expect_key: mapping,
             flow,
         });
+    }
+
+    /// Whether the next node is the key of a mapping entry.
+    fn in_key_position(&self) -> bool {
+        self.stack.last().is_some_and(|top| top.expect_key)
+    }
+
+    /// Holds a node that is the key of a mapping entry and is not a scalar,
+    /// such as `? [a, b]` or `*alias :`, in the arena and in no entry.
+    /// The value after it becomes an entry with no key text, which a lookup
+    /// by key never finds and `Node::entries` leaves out.
+    fn detach_key(&mut self, mut node: Node) -> usize {
+        let id = self.nodes.len();
+        if let Some(top) = self.stack.last_mut() {
+            node.parent = Some(top.node);
+            top.expect_key = false;
+        }
+        self.nodes.push(node);
+        id
     }
 
     fn attach(&mut self, mut node: Node) -> usize {

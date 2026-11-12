@@ -171,3 +171,98 @@ fn a_hash_inside_a_block_scalar_is_not_a_comment() {
     "};
     assert_eq!(&source[next.start..next.end], expected);
 }
+
+fn keys(document: &Document, path: &Path) -> Vec<String> {
+    document
+        .node(path)
+        .map(|node| node.entries().map(|(key, _)| key.to_owned()).collect())
+        .unwrap_or_default()
+}
+
+#[test]
+fn a_mapping_lists_its_entries_in_the_order_written() {
+    let document = Document::parse(ROWS).unwrap();
+    assert_eq!(keys(&document, &Path::root()), ["queue"]);
+    let first = Path::root().key("queue").index(0);
+    assert_eq!(keys(&document, &first), ["id", "title"]);
+    let node = document.node(&first).unwrap();
+    let texts: Vec<String> = node
+        .entries()
+        .map(|(_, value)| value.text().to_owned())
+        .collect();
+    assert_eq!(texts, ["A-1", r#""First: row""#]);
+}
+
+#[test]
+fn a_key_is_the_scalar_the_parser_read() {
+    let document = Document::parse("{z: 1, \"b c\": two, 'd': three}\n").unwrap();
+    assert_eq!(keys(&document, &Path::root()), ["z", "b c", "d"]);
+    let document = Document::parse("\"a\\u0041\": 1\n").unwrap();
+    assert_eq!(keys(&document, &Path::root()), ["aA"]);
+}
+
+#[test]
+fn an_anchor_and_a_tag_stay_outside_the_span_of_a_value() {
+    let source = indoc! {"
+        a: &x text
+        b: *x
+        c: !!str 12
+        d: &y !!str t
+    "};
+    let document = Document::parse(source).unwrap();
+    let root = document.node(&Path::root()).unwrap();
+    let seen: Vec<_> = root
+        .entries()
+        .map(|(key, value)| {
+            let at = value.value();
+            (key, &source[at.start..at.end], value.style())
+        })
+        .collect();
+    assert_eq!(
+        seen,
+        [
+            ("a", "text", Style::Plain),
+            ("b", "*x", Style::Alias),
+            ("c", "12", Style::Plain),
+            ("d", "t", Style::Plain),
+        ]
+    );
+}
+
+#[test]
+fn an_entry_with_a_key_that_is_no_scalar_is_left_out() {
+    let source = indoc! {"
+        ? [a, b]
+        : v
+        z: w
+        ? {c: d}
+        : u
+        y: x
+    "};
+    let document = Document::parse(source).unwrap();
+    assert_eq!(keys(&document, &Path::root()), ["z", "y"]);
+    let z = document.node(&Path::root().key("z")).unwrap();
+    assert_eq!(z.text(), "w");
+    let y = document.node(&Path::root().key("y")).unwrap();
+    assert_eq!(y.text(), "x");
+}
+
+#[test]
+fn an_alias_as_a_key_is_left_out() {
+    let source = indoc! {"
+        k: &k key
+        *k : v
+        z: w
+    "};
+    let document = Document::parse(source).unwrap();
+    assert_eq!(keys(&document, &Path::root()), ["k", "z"]);
+}
+
+#[test]
+fn a_node_that_is_no_mapping_has_no_entries() {
+    let document = Document::parse("- a\n- b\n").unwrap();
+    assert_eq!(keys(&document, &Path::root()), Vec::<String>::new());
+    let document = Document::parse("a: 1\n").unwrap();
+    let a = document.node(&Path::root().key("a")).unwrap();
+    assert_eq!(a.entries().count(), 0);
+}
