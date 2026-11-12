@@ -266,3 +266,29 @@ fn a_node_that_is_no_mapping_has_no_entries() {
     let a = document.node(&Path::root().key("a")).unwrap();
     assert_eq!(a.entries().count(), 0);
 }
+
+#[test]
+fn a_key_after_a_complex_key_is_found_by_path() {
+    let source = indoc! {"
+        ? [a, b]
+        : v
+        z: w
+    "};
+    let document = Document::parse(source).unwrap();
+    let z = document.node(&Path::root().key("z")).unwrap();
+    assert_eq!(z.text(), "w");
+    assert_eq!(z.key().map(|key| &source[key.start..key.end]), Some("z"));
+}
+
+#[test]
+fn a_key_after_an_alias_key_is_found_by_path() {
+    let source = indoc! {"
+        k: &k key
+        *k : v
+        z: w
+    "};
+    let document = Document::parse(source).unwrap();
+    let z = document.node(&Path::root().key("z")).unwrap();
+    assert_eq!(z.text(), "w");
+    assert_eq!(z.key().map(|key| &source[key.start..key.end]), Some("z"));
+}
