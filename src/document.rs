@@ -60,7 +60,7 @@ pub struct Node<'a> {
     id: usize,
 }
 
-impl Node<'_> {
+impl<'a> Node<'a> {
     /// Where the value is written.
     #[must_use]
     pub fn value(&self) -> Location {
@@ -103,6 +103,27 @@ impl Node<'_> {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+
+    /// The entries of a mapping that have a scalar key, in the order written,
+    /// each as the key's text and the node of its value; none for any other
+    /// node.
+    ///
+    /// A key's text is the scalar the parser read, so `"b c"` and `'b c'` are
+    /// both `b c`. An entry whose key is a sequence, a mapping or an alias is
+    /// left out, and the entries after it stay.
+    pub fn entries(&self) -> impl Iterator<Item = (&'a str, Node<'a>)> + use<'a> {
+        let document = self.document;
+        let index = &document.index;
+        let children = index
+            .nodes
+            .get(self.id)
+            .filter(|node| matches!(node.style, Style::BlockMapping | Style::FlowMapping))
+            .map_or(&[][..], |node| node.children.as_slice());
+        children.iter().filter_map(move |&id| {
+            let key = index.nodes.get(id)?.key.as_ref()?;
+            Some((key.text.as_str(), Node { document, id }))
+        })
     }
 
     /// The value as written in the source.
