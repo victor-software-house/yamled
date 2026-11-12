@@ -1,5 +1,10 @@
 # Changelog
 
+## yamled 0.0.13
+
+- `Node::entries` lists the entries of a mapping with a scalar key, each as the key's text and the node of its value, in the order written.
+An entry whose key is a sequence, a mapping or an alias no longer hides the entries after it from a lookup by path ([`cd6f3d4`](https://github.com/victor-software-house/yamled/commit/cd6f3d474481346e05e736a25552af7d8f14bdfd)).
+
 ## yamled 0.0.12
 
 - The `serde` feature takes vsh-serde-saphyr 0.0.3, which adds the fork's license attribution and changes no code. A program that also depends on ctl-core keeps linking one serde-saphyr once ctl-core moves to the same release ([`12ec012`](https://github.com/victor-software-house/yamled/commit/12ec012efd72567e6b1576b05d23eabe0de0b3ca)).
