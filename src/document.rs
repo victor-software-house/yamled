@@ -1,5 +1,5 @@
-use std::fmt;
 use std::ops::Range;
+use std::{fmt, iter};
 
 use crate::index::{Index, Location, Style};
 use crate::text::{
@@ -555,7 +555,7 @@ impl Document {
         };
         let head = spaced(&[&properties, &comment]);
         let step = if self.compact { 0 } else { 2 };
-        let placed: Vec<String> = std::iter::once(if head.is_empty() {
+        let placed: Vec<String> = iter::once(if head.is_empty() {
             head
         } else {
             format!(" {head}")

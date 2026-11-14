@@ -175,8 +175,7 @@ fn a_hash_inside_a_block_scalar_is_not_a_comment() {
 fn keys(document: &Document, path: &Path) -> Vec<String> {
     document
         .node(path)
-        .map(|node| node.entries().map(|(key, _)| key.to_owned()).collect())
-        .unwrap_or_default()
+        .map_or_default(|node| node.entries().map(|(key, _)| key.to_owned()).collect())
 }
 
 #[test]

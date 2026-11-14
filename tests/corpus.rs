@@ -28,7 +28,7 @@ struct Tally {
 /// Every `in.yaml` under the suite, in a stable order. The suite's `name`
 /// and `tags` folders are links back to the same cases.
 fn inputs() -> Vec<PathBuf> {
-    let suite = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/yaml-test-suite");
+    let suite = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/yaml-test-suite");
     let mut found = Vec::new();
     let mut pending = vec![suite.clone()];
     while let Some(dir) = pending.pop() {

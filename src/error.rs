@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{error, fmt};
 
 use crate::Path;
 
@@ -104,4 +104,4 @@ impl fmt::Display for Error {
     }
 }
 
-impl std::error::Error for Error {}
+impl error::Error for Error {}
