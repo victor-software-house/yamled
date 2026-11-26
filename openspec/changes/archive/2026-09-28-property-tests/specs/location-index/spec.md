@@ -18,6 +18,7 @@ SHALL end at its header.
   ```
 
 - **AND** the caller replaces `clip` with `text`
+
 - **THEN** the source reads:
 
   ```yaml

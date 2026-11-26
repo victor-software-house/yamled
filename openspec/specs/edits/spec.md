@@ -86,7 +86,9 @@ style: items indented under their key, or at the key's column.
 #### Scenario: The first row goes into an empty queue
 
 - **WHEN** the source has `queue: []`
+
 - **AND** the caller pushes a mapping `{id: T-001, acceptance: [It holds.]}`
+
 - **THEN** the source reads:
 
   ```yaml
@@ -207,6 +209,7 @@ SHALL fail with `Error::Repeated`, and a child that does not exist with
   ```
 
 - **AND** the caller reorders the root as `queue`, `horizon`, `archive`
+
 - **THEN** the source reads:
 
   ```yaml
@@ -265,6 +268,7 @@ would parse as a different structure, the edit SHALL fail with
   ```
 
 - **AND** the caller re-indents `queue` to column 2
+
 - **THEN** the source reads:
 
   ```yaml
@@ -304,6 +308,7 @@ owns.
   ```
 
 - **AND** the caller replaces `key` with `new`
+
 - **THEN** the source reads:
 
   ```yaml

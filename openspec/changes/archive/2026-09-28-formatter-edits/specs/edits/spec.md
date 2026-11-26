@@ -24,6 +24,7 @@ SHALL fail with `Error::Repeated`, and a child that does not exist with
   ```
 
 - **AND** the caller reorders the root as `queue`, `horizon`, `archive`
+
 - **THEN** the source reads:
 
   ```yaml
@@ -82,6 +83,7 @@ would parse as a different structure, the edit SHALL fail with
   ```
 
 - **AND** the caller re-indents `queue` to column 2
+
 - **THEN** the source reads:
 
   ```yaml

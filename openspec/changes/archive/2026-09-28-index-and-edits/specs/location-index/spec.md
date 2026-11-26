@@ -21,6 +21,7 @@ the parser's line and column.
 
 - **THEN** the node at path `queue` / `0` / `title` has value text
   `"First: row"`, style double-quoted, and a key range covering `title`
+
 - **AND** the node at path `queue` has style block sequence and 1 child
 
 #### Scenario: Invalid YAML is refused with its location
@@ -66,4 +67,5 @@ comment line and end at the end of its last line.
   ```
 
 - **THEN** the owned range of `queue` / `0` starts at the `# owns A-1` line
+
 - **AND** the owned range of `queue` / `1` includes `# right`
