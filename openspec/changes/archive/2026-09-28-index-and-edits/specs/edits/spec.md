@@ -67,7 +67,9 @@ style: items indented under their key, or at the key's column.
 #### Scenario: The first row goes into an empty queue
 
 - **WHEN** the source has `queue: []`
+
 - **AND** the caller pushes a mapping `{id: T-001, acceptance: [It holds.]}`
+
 - **THEN** the source reads:
 
   ```yaml

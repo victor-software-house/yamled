@@ -17,6 +17,7 @@ owns.
   ```
 
 - **AND** the caller replaces `key` with `new`
+
 - **THEN** the source reads:
 
   ```yaml
