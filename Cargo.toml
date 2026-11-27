@@ -1,6 +1,6 @@
 [package]
 name = "yamled"
-version = "0.0.13"
+version = "0.0.14"
 edition = "2024"
 rust-version = "1.100.0"
 description = "Format-preserving YAML edits: change what you meant, keep every other byte"
