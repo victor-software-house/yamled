@@ -1,5 +1,10 @@
 # Changelog
 
+## yamled 0.0.14
+
+- The `serde` feature takes vsh-serde-saphyr 0.0.6, the release ctl-core 0.8.0-rc.2 pins.
+  A program that depends on both, such as qctl or forkctl, links one serde-saphyr again ([`7851633`](https://github.com/victor-software-house/yamled/commit/7851633d369bf085621baa39e508c46a71632a3d)).
+
 ## yamled 0.0.13
 
 - `Node::entries` lists the entries of a mapping with a scalar key, each as the key's text and the node of its value, in the order written.
