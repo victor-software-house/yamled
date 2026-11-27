@@ -670,9 +670,9 @@ checksum = "b4ac048d71ede7ee76d585517add45da530660ef4390e49b098733c6e897f254"
 
 [[package]]
 name = "vsh-serde-saphyr"
-version = "0.0.3"
+version = "0.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5515ffe30379241c0d7d0e3a50c6b5eb3409f6f08cd37b992858b6fa7092d9c3"
+checksum = "8f128724dc325d437cb731cd187a6d6e009830cee57f98a3028c16da871cf649"
 dependencies = [
  "annotate-snippets",
  "base64",
