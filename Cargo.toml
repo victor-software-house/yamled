@@ -119,11 +119,14 @@ granit-parser = "2.0.0"
 serde = { version = "1.0.228", default-features = false, features = [
   "std",
 ], optional = true }
-# serde-saphyr 2.1.1 with two patches, under its own library name: its
+# serde-saphyr 2.1.1 with six patches, under its own library name: its
 # deserializer no longer formats a whole error report, snippet renderer
 # included, to tell two errors apart or to fill an alias error's message.
-# Drop the fork when upstream does the same.
-serde-saphyr = { package = "vsh-serde-saphyr", version = "=0.0.3", default-features = false, features = [
+# Tagged<T> gives its inner type the plain node, `located::read` reads a text
+# into nodes with byte spans, and `scalars` makes the YAML 1.2 scalar rules
+# public. ctl-core pins the same release, so a program that uses both links one
+# serde-saphyr. Drop the fork when upstream does all six.
+serde-saphyr = { package = "vsh-serde-saphyr", version = "=0.0.6", default-features = false, features = [
   "serialize",
   "deserialize",
 ], optional = true }
